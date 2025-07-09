@@ -1,5 +1,6 @@
 faq_data = [
     {
+        "id": 1,
         "pergunta": "Mensagem de boas-vindas",
         "resposta": (
             "Fala, mestre! 👋🍺 Bem-vindo à Loja CHOPP! Sou o garçom digital e tô aqui pra ajudar.\n\n"
@@ -13,6 +14,7 @@ faq_data = [
         "palavras_chave": ["oi", "olá", "começar", "início", "e aí", "opa", "bom dia", "boa tarde", "boa noite", "fala", "saudação", "ajuda"]
     },
     {
+        "id": 2,
         "pergunta": "Como saber quantos litros de chope preciso para o meu evento?",
         "resposta": (
             "A recomendação inicial é 2 litros por pessoa em eventos de até 4 horas. Para um cálculo mais preciso, utilize a Calculadora da Chopp Brahma Express: "
@@ -30,6 +32,7 @@ faq_data = [
         ]
     },
     {
+        "id": 3,
         "pergunta": "Qual é o horário de atendimento de vocês?",
         "resposta": "🕘 Segunda a sexta: das 09h às 18h 🕗 Sábado: das 08h às 12h 🚫 Domingo: fechado",
         "palavras_chave": [
@@ -39,6 +42,7 @@ faq_data = [
         ]
     },
     {
+        "id": 4,
         "pergunta": "Quais são os documentos exigidos para o empréstimo dos equipamentos?",
         "resposta": (
             "Por motivos de segurança, alguns documentos podem ser requisitados pela franquia para o empréstimo dos equipamentos (barril, chopeira e outros)."
@@ -49,6 +53,7 @@ faq_data = [
         ]
     },
     {
+        "id": 5,
         "pergunta": "Como encontrar a loja Chopp Brahma Express mais próxima?",
         "resposta": (
             "No site do Chopp Brahma Express, insira o número do CEP. O sistema indica automaticamente a loja mais próxima para entrega e suporte. "
@@ -60,6 +65,7 @@ faq_data = [
         ]
     },
     {
+        "id": 6,
         "pergunta": "Quais produtos estão disponíveis e como selecionar?",
         "resposta": (
             "Cada loja tem um portfólio específico. Acesse o site, consulte os produtos e serviços da sua região e adicione ao carrinho. "
@@ -72,6 +78,7 @@ faq_data = [
         ]
     },
     {
+        "id": 7,
         "pergunta": "Como agendar a entrega e devolução dos produtos?",
         "resposta": (
             "Após escolher seus produtos, agende no site tanto a data de entrega quanto a de devolução. A Chopeira e demais itens são emprestados e devem ser devolvidos conforme o combinado."
@@ -82,6 +89,7 @@ faq_data = [
         ]
     },
     {
+        "id": 8,
         "pergunta": "Quais são as formas de pagamento?",
         "resposta": (
             "O pagamento no site é feito via Cartão de Crédito à vista (Visa, Mastercard, Amex, Diners, Elo). Algumas lojas aceitam boleto — essa opção deve ser confirmada com a unidade responsável."
@@ -92,6 +100,7 @@ faq_data = [
         ]
     },
     {
+        "id": 9,
         "pergunta": "Como acessar a área de cadastro?",
         "resposta": (
             "Com a reformulação do site, é necessário criar um novo login e senha. Acesse: https://choppbrahmaexpress.com.br/customer/account/login/"
@@ -102,6 +111,7 @@ faq_data = [
         ]
     },
     {
+        "id": 10,
         "pergunta": "Todos os produtos estão disponíveis para todas as regiões?",
         "resposta": (
             "Os produtos estão sujeitos à disponibilidade de cada Loja Chopp Brahma Express. No site, ao inserir seu CEP, será exibido o portfólio e disponibilidade específicos da loja mais próxima."
@@ -112,6 +122,7 @@ faq_data = [
         ]
     },
     {
+        "id": 11,
         "pergunta": "É possível contratar o serviço de chopeiro?",
         "resposta": (
             "Sim! A disponibilidade depende da loja. Ao inserir o CEP no site, essa informação é indicada. Após confirmar o pedido, você também pode verificar com a loja responsável — o contato estará no e-mail de confirmação."
@@ -122,6 +133,7 @@ faq_data = [
         ]
     },
     {
+        "id": 12,
         "pergunta": "Como acompanhar o status do pedido?",
         "resposta": (
             "O acompanhamento é feito diretamente com a loja Chopp Brahma Express responsável, informada após a escolha do CEP. O contato estará no e-mail de confirmação/aprovação do pagamento."
@@ -132,6 +144,7 @@ faq_data = [
         ]
     },
     {
+        "id": 13,
         "pergunta": "Como é feita a entrega do serviço?",
         "resposta": (
             "O serviço é entregue no local indicado no pedido. Um técnico leva o equipamento e realiza a instalação da Chopeira. É necessário que um responsável esteja presente para receber o técnico. "
@@ -143,6 +156,7 @@ faq_data = [
         ]
     },
     {
+        "id": 14,
         "pergunta": "Como calcular o valor da entrega?",
         "resposta": (
             "O valor do frete varia de acordo com o endereço informado no momento do pedido. A simulação é feita automaticamente no site."
@@ -153,6 +167,7 @@ faq_data = [
         ]
     },
     {
+        "id": 15,
         "pergunta": "A compra inclui a Chopeira e barril?",
         "resposta": (
             "Não. A compra é do Chopp. A Chopeira, o barril e os demais itens são emprestados gratuitamente — devem ser devolvidos conforme o combinado com a loja."
@@ -163,6 +178,7 @@ faq_data = [
         ]
     },
     {
+        "id": 16,
         "pergunta": "O que inclui o kit Chopp Brahma Express?",
         "resposta": (
             "O kit inclui: 1 Chopeira, manômetro/regulador, válvula extratora (por barril/sabor), cilindro de gás (CO₂ ou N₂), e mangueiras para conexão. "
@@ -174,6 +190,7 @@ faq_data = [
         ]
     },
     {
+        "id": 17,
         "pergunta": "O que é necessário para instalar a Chopeira elétrica?",
         "resposta": (
             "Verifique a voltagem do local (110V ou 220V), reserve uma mesa ou superfície firme próxima a uma tomada exclusiva e longe de fontes de calor."
@@ -184,6 +201,7 @@ faq_data = [
         ]
     },
     {
+        "id": 18,
         "pergunta": "Como servir o melhor Chopp?",
         "resposta": (
             "Incline o copo a 45°, puxe a alavanca para frente para servir com equilíbrio entre líquido e espuma. Depois, leve a alavanca para trás para formar o colarinho. "
@@ -195,6 +213,7 @@ faq_data = [
         ]
     },
     {
+        "id": 19,
         "pergunta": "O que fazer se o Chopp estiver com problema de qualidade?",
         "resposta": (
             "Caso perceba alteração no sabor ou qualidade do Chopp, entre em contato via inbox na página oficial do Facebook: www.facebook.com/ChoppBrahmaExpressBrasil/"
@@ -205,6 +224,7 @@ faq_data = [
         ]
     },
     {
+        "id": 20,
         "pergunta": "Qual o prazo de validade do Chopp?",
         "resposta": (
             "O prazo médio de validade do Chopp é de 10 dias após a fabricação. Após aberto e instalado, deve ser consumido em até 2 dias para garantir frescor e qualidade."
@@ -215,6 +235,7 @@ faq_data = [
         ]
     },
     {
+        "id": 21,
         "pergunta": "Como pedir mais Chopp ou produtos extras?",
         "resposta": (
             "Se faltarem 3 ou mais dias para o evento, faça um novo pedido no site. Se faltarem menos de 3 dias, ou se for no dia do evento, ligue diretamente para a loja responsável (contato no e-mail de confirmação). "
@@ -226,6 +247,7 @@ faq_data = [
         ]
     },
     {
+        "id": 22,
         "pergunta": "O pedido pode ser cancelado?",
         "resposta": (
             "Sim. O cancelamento deve ser feito com até 1 dia de antecedência junto à loja responsável (contato no e-mail de confirmação). "
@@ -237,6 +259,7 @@ faq_data = [
         ]
     },
     {
+        "id": 23,
         "pergunta": "O que é o Choppback?",
         "resposta": (
             "💰 Ao realizar uma compra no site, 5% do valor pago volta como créditos na sua conta. Você poderá utilizá-los em compras futuras como forma de desconto."
@@ -247,6 +270,7 @@ faq_data = [
         ]
     },
     {
+        "id": 24,
         "pergunta": "Como faço para me cadastrar no Choppback?",
         "resposta": (
             "📝 Após fazer seu cadastro no site e realizar sua primeira compra, você já começa a participar automaticamente do programa Choppback."
@@ -257,6 +281,7 @@ faq_data = [
         ]
     },
     {
+        "id": 25,
         "pergunta": "Quais produtos são elegíveis ao Choppback?",
         "resposta": (
             "✅ Todos os produtos vendidos no site estão elegíveis ao Choppback, desde que sua compra totalize R$50,00 ou mais (excluindo frete)."
@@ -267,6 +292,7 @@ faq_data = [
         ]
     },
     {
+        "id": 26,
         "pergunta": "Quanto de Choppback posso ganhar?",
         "resposta": (
             "🎯 Você ganha 5% do valor pago nos produtos por compra, com limite máximo de R$100,00 em crédito por pedido."
@@ -277,6 +303,7 @@ faq_data = [
         ]
     },
     {
+        "id": 27,
         "pergunta": "Como consultar meu saldo e extrato do Choppback?",
         "resposta": (
             "📊 Faça login com o e-mail cadastrado, clique em \"Choppback\" no menu à direita e confira seu saldo e extrato com todas as movimentações."
@@ -287,6 +314,7 @@ faq_data = [
         ]
     },
     {
+        "id": 28,
         "pergunta": "Como usar meus créditos do Choppback?",
         "resposta": (
             "🛍️ Ao finalizar a compra, na etapa de pagamento, você escolhe quantos créditos do Choppback quer utilizar como desconto."
@@ -297,6 +325,7 @@ faq_data = [
         ]
     },
     {
+        "id": 29,
         "pergunta": "Meus créditos têm validade?",
         "resposta": (
             "⏳ Sim. Todos os créditos têm validade de 180 dias a partir da data em que foram concedidos."
@@ -307,6 +336,7 @@ faq_data = [
         ]
     },
     {
+        "id": 30,
         "pergunta": "Em quanto tempo meu crédito fica disponível?",
         "resposta": (
             "⌚ O crédito do Choppback é liberado em até 7 dias após o faturamento do pedido. Ele pode ser cancelado se o pagamento não for confirmado ou o pedido for incompleto."
@@ -317,6 +347,7 @@ faq_data = [
         ]
     },
     {
+        "id": 31,
         "pergunta": "Em quais produtos posso usar meus créditos?",
         "resposta": (
             "🛒 Os créditos do Choppback podem ser usados na compra de qualquer produto da loja online Chopp Brahma Express."
@@ -327,6 +358,7 @@ faq_data = [
         ]
     },
     {
+        "id": 32,
         "pergunta": "Não consegui usar meus créditos. O que fazer?",
         "resposta": (
             "☎️ Verifique se está logado com o e-mail correto e se os créditos ainda estão válidos. Se o problema persistir, envie um e-mail para atendimento@choppbrahmaexpress.com.br ou ligue para 0800 888 1021."
@@ -337,6 +369,7 @@ faq_data = [
         ]
     },
     {
+        "id": 33,
         "pergunta": "Tem alguma forma de pagamento que não acumula Choppback?",
         "resposta": (
             "🚫 Pagamentos feitos com Vale-Presente ou Voucher não geram crédito Choppback."
@@ -347,6 +380,7 @@ faq_data = [
         ]
     },
     {
+        "id": 34,
         "pergunta": "O valor do frete também acumula crédito no Choppback?",
         "resposta": (
             "📦 Não. O crédito é calculado apenas sobre o valor dos produtos. O frete não entra no cálculo."
@@ -357,6 +391,7 @@ faq_data = [
         ]
     },
     {
+        "id": 35,
         "pergunta": "Posso utilizar apenas uma parte do meu crédito?",
         "resposta": (
             "🎚️ Sim! No momento do pagamento, você escolhe quanto dos seus créditos deseja aplicar — total ou parcial."
@@ -367,6 +402,7 @@ faq_data = [
         ]
     },
     {
+        "id": 36,
         "pergunta": "Posso usar cupons de desconto junto com o Choppback?",
         "resposta": (
             "🎟️ Sim! Cupons e Choppback podem ser usados na mesma compra. O crédito será calculado sobre o valor com desconto."
@@ -377,6 +413,7 @@ faq_data = [
         ]
     },
     {
+        "id": 37,
         "pergunta": "Não tenho Choppback suficiente. Posso pagar o restante com outra forma de pagamento?",
         "resposta": (
             "💳 Sim! Você pode usar parte dos créditos e completar o restante com qualquer método de pagamento disponível no site."
@@ -387,6 +424,7 @@ faq_data = [
         ]
     },
     {
+        "id": 38,
         "pergunta": "Em compras parceladas, como o Choppback será creditado?",
         "resposta": (
             "🧾 O valor total do crédito entra na sua conta de uma vez só, independente do número de parcelas. Mas será cancelado em caso de não confirmação de pagamento ou pedido incompleto."
@@ -397,6 +435,7 @@ faq_data = [
         ]
     },
     {
+        "id": 39,
         "pergunta": "Como fica o crédito se eu pagar com Vale-Presente ou Choppback?",
         "resposta": (
             "🪙 O crédito será gerado apenas sobre a parte paga com outra forma (ex: cartão). Valores pagos com Choppback ou Vale-Presente não acumulam novo crédito."
@@ -407,6 +446,7 @@ faq_data = [
         ]
     },
     {
+        "id": 40,
         "pergunta": "Pode haver diferença de validade do crédito entre produtos?",
         "resposta": (
             "🗓️ Não. Todo crédito gerado tem validade uniforme de 180 dias, independente do tipo de produto comprado."
@@ -417,6 +457,7 @@ faq_data = [
         ]
     },
     {
+        "id": 41,
         "pergunta": "Se a compra for cancelada, o que acontece com o crédito?",
         "resposta": (
             "🚫 Os créditos gerados a partir daquela compra serão automaticamente cancelados e perderão a validade."
@@ -427,6 +468,7 @@ faq_data = [
         ]
     },
     {
+        "id": 42,
         "pergunta": "Por que não acumulei mais Choppback em uma compra acima de R$2.000,00?",
         "resposta": (
             "📉 Mesmo que o valor total ultrapasse R$2.000,00, o limite máximo por compra é de R$100,00 em créditos de Choppback."
@@ -437,6 +479,7 @@ faq_data = [
         ]
     },
     {
+        "id": 43,
         "pergunta": "Posso usar meu saldo do Choppback em uma loja física?",
         "resposta": (
             "🛑 Não. O Choppback é exclusivo para compras online realizadas no site oficial: https://www.choppbrahmaexpress.com.br"
@@ -447,6 +490,7 @@ faq_data = [
         ]
     },
     {
+        "id": 44,
         "pergunta": "Vocês atendem na minha região?",
         "resposta": (
             "📍 Atendemos sim! Nosso serviço cobre Brasília e diversas regiões próximas. Se você está em alguma dessas localidades, estamos prontos para entregar aí:\n"
@@ -460,6 +504,7 @@ faq_data = [
         ]
     },
     {
+        "id": 45,
         "pergunta": "Quais regiões vocês atendem?",
         "resposta": (
             "🗺️ Atendemos nas principais regiões administrativas e cidades do Distrito Federal e entorno. Veja a lista completa das áreas cobertas:\n"
