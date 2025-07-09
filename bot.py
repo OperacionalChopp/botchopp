@@ -98,10 +98,18 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         # Encontra a FAQ correspondente na sua base de conhecimento pelo ID
         for item in faq_data:
             if item["id"] == faq_id_selecionado:
-                await query.edit_message_text(text=item["resposta"]) # Edita a mensagem original com a resposta
+                # Mude esta linha:
+                # await query.edit_message_text(text=item["resposta"]) # <-- REMOVA ESTA LINHA
+                
+                # Adicione esta linha para enviar uma NOVA mensagem com a resposta
+                await query.message.reply_text(text=item["resposta"]) 
+                
+                # Opcional: Se quiser remover os botões da mensagem original após a escolha
+                # await query.edit_message_reply_markup(reply_markup=None)
+                
                 return
         
-        await query.edit_message_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
+        await query.message.reply_text(text="Desculpe, não consegui encontrar a resposta para essa opção.") # Mude aqui também
 
 
 # Adiciona handler de texto
