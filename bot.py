@@ -36,10 +36,10 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for item in faq_data:
         score = 0
         # Tokeniza as palavras-chave da FAQ
+        # Garante que estamos comparando palavras inteiras, não substrings
         palavras_chave_item = set(item["palavras_chave"])
 
-        # Verifica a interseção entre as palavras do usuário e as palavras-chave da FAQ
-        # Isso garante que estamos procurando por palavras inteiras, não substrings
+        # Calcula a interseção entre as palavras do usuário e as palavras-chave da FAQ
         intersecao = palavras_do_usuario.intersection(palavras_chave_item)
         
         # A pontuação é o número de palavras-chave que correspondem
@@ -74,11 +74,8 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Múltiplas FAQs com a mesma maior pontuação, oferece opções com botões
         keyboard = []
         for faq in top_matched_faqs:
-            # Usamos a "pergunta" como texto do botão e a "pergunta" como dado de callback
-            # ATENÇÃO: callback_data tem limite de 64 bytes. Se a pergunta for longa,
-            # precisaremos de uma estratégia diferente (ex: ID da FAQ).
-            # Por enquanto, vamos usar a pergunta.
-            keyboard.append([InlineKeyboardButton(faq["pergunta"], callback_data=f"faq_{faq['pergunta']}")])
+            # Usa o ID da FAQ como callback_data para evitar o limite de 64 bytes
+            keyboard.append([InlineKeyboardButton(faq["pergunta"], callback_data=f"faq_id_{faq['id']}")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
@@ -88,36 +85,4 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Novo handler para cliques em botões inline
 async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer() # Responde ao callback para remover o "carregando" no Telegram
-
-    callback_data = query.data
     
-    if callback_data.startswith("faq_"):
-        # Extrai a pergunta do callback_data
-        pergunta_selecionada = callback_data[len("faq_"):]
-        
-        # Encontra a FAQ correspondente na sua base de conhecimento
-        for item in faq_data:
-            if item["pergunta"] == pergunta_selecionada:
-                await query.edit_message_text(text=item["resposta"]) # Edita a mensagem original com a resposta
-                return
-        
-        await query.edit_message_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
-
-
-# Adiciona handler de texto
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
-# Adiciona o novo handler para callbacks de botões
-application.add_handler(CallbackQueryHandler(button_callback_handler))
-
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
-
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path="/api/telegram/webhook",
-        webhook_url=WEBHOOK_URL
-    )
