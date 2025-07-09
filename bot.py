@@ -1,3 +1,4 @@
+TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -85,4 +86,36 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Novo handler para cliques em botões inline
 async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer() # Responde ao callback para remover o "carregando" no Telegram
+
+    callback_data = query.data
     
+    if callback_data.startswith("faq_id_"):
+        # Extrai o ID da FAQ do callback_data
+        faq_id_selecionado = int(callback_data[len("faq_id_"):])
+        
+        # Encontra a FAQ correspondente na sua base de conhecimento pelo ID
+        for item in faq_data:
+            if item["id"] == faq_id_selecionado:
+                await query.edit_message_text(text=item["resposta"]) # Edita a mensagem original com a resposta
+                return
+        
+        await query.edit_message_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
+
+
+# Adiciona handler de texto
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
+# Adiciona o novo handler para callbacks de botões
+application.add_handler(CallbackQueryHandler(button_callback_handler))
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 8000))
+
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path="/api/telegram/webhook",
+        webhook_url=WEBHOOK_URL
+    )
