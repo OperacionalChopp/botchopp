@@ -1,24 +1,31 @@
-from flask import Flask, request
-import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
+from base_conhecimento.faq_data import faq_data
 
-TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"  # Cole seu token do BotFather aqui
-URL = f"https://api.telegram.org/bot{TOKEN}/"
+async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    texto = update.message.text.lower()
 
-app = Flask(__name__)
+    for item in faq_data:
+        for palavra in item["palavras_chave"]:
+            if palavra in texto:
+                await update.message.reply_text(item["resposta"])
+                return
 
-@app.route("/", methods=["POST"])
-def webhook():
-    data = request.get_json()
-    if "message" in data:
-        chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
-        send_message(chat_id, f"Você disse: {text}")
-    return "ok"
+    # fallback se nada bateu
+    await update.message.reply_text(
+        "Desculpe, não entendi. 🤔\n"
+        "Você pode perguntar sobre horário, formas de pagamento, região de atendimento, etc."
+    )
 
-def send_message(chat_id, text):
-    url = URL + "sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
-    requests.post(url, json=payload)
+async def main():
+    # substitua pelo seu token real
+    app = ApplicationBuilder().token("7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw").build()
+
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
+
+    print("Bot CHOPP rodando...")
+    await app.run_polling()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import asyncio
+    asyncio.run(main())
