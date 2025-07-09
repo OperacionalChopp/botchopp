@@ -1,10 +1,11 @@
 import os
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
     MessageHandler,
-    filters
+    filters,
+    CallbackQueryHandler
 )
 from base_conhecimento.faq_data import faq_data
 
@@ -23,29 +24,100 @@ application = (
 
 # Handler de mensagens
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    texto = update.message.text.lower()
+    texto_usuario = update.message.text.lower()
+    
+    # Lista para armazenar as FAQs que correspondem, com uma pontuação
+    scored_faqs = []
+    
+    # Tokeniza o texto do usuário para correspondência de palavras inteiras
+    # Usamos set para eficiência e para lidar com palavras únicas
+    palavras_do_usuario = set(texto_usuario.split()) 
+
     for item in faq_data:
-        for palavra in item["palavras_chave"]:
-            if palavra in texto:
-                await update.message.reply_text(item["resposta"])
+        score = 0
+        # Tokeniza as palavras-chave da FAQ
+        palavras_chave_item = set(item["palavras_chave"])
+
+        # Verifica a interseção entre as palavras do usuário e as palavras-chave da FAQ
+        # Isso garante que estamos procurando por palavras inteiras, não substrings
+        intersecao = palavras_do_usuario.intersection(palavras_chave_item)
+        
+        # A pontuação é o número de palavras-chave que correspondem
+        score = len(intersecao)
+
+        # Se houver alguma correspondência, adiciona à lista com a pontuação
+        if score > 0:
+            scored_faqs.append({"faq": item, "score": score})
+
+    # Ordena as FAQs encontradas pela pontuação (do maior para o menor)
+    scored_faqs.sort(key=lambda x: x["score"], reverse=True)
+
+    # Filtra as FAQs com a pontuação máxima para lidar com desambiguação
+    if scored_faqs:
+        max_score = scored_faqs[0]["score"]
+        # Pega todas as FAQs que têm a pontuação máxima
+        top_matched_faqs = [s["faq"] for s in scored_faqs if s["score"] == max_score]
+    else:
+        top_matched_faqs = [] # Nenhuma FAQ encontrada
+
+    # Lógica de resposta
+    if not top_matched_faqs:
+        # Nenhuma FAQ encontrada
+        await update.message.reply_text(
+            "Desculpe, não entendi. 🤔\n"
+            "Você pode perguntar sobre horário, formas de pagamento, região de atendimento, etc."
+        )
+    elif len(top_matched_faqs) == 1:
+        # Apenas uma FAQ com a maior pontuação, responde diretamente
+        await update.message.reply_text(top_matched_faqs[0]["resposta"])
+    else:
+        # Múltiplas FAQs com a mesma maior pontuação, oferece opções com botões
+        keyboard = []
+        for faq in top_matched_faqs:
+            # Usamos a "pergunta" como texto do botão e a "pergunta" como dado de callback
+            # ATENÇÃO: callback_data tem limite de 64 bytes. Se a pergunta for longa,
+            # precisaremos de uma estratégia diferente (ex: ID da FAQ).
+            # Por enquanto, vamos usar a pergunta.
+            keyboard.append([InlineKeyboardButton(faq["pergunta"], callback_data=f"faq_{faq['pergunta']}")])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "Encontrei algumas informações que podem ser úteis. Qual delas você procura?",
+            reply_markup=reply_markup
+        )
+
+# Novo handler para cliques em botões inline
+async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer() # Responde ao callback para remover o "carregando" no Telegram
+
+    callback_data = query.data
+    
+    if callback_data.startswith("faq_"):
+        # Extrai a pergunta do callback_data
+        pergunta_selecionada = callback_data[len("faq_"):]
+        
+        # Encontra a FAQ correspondente na sua base de conhecimento
+        for item in faq_data:
+            if item["pergunta"] == pergunta_selecionada:
+                await query.edit_message_text(text=item["resposta"]) # Edita a mensagem original com a resposta
                 return
-    await update.message.reply_text(
-        "Desculpe, não entendi. 🤔\n"
-        "Você pode perguntar sobre horário, formas de pagamento, região de atendimento, etc."
-    )
+        
+        await query.edit_message_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
+
 
 # Adiciona handler de texto
 application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
+# Adiciona o novo handler para callbacks de botões
+application.add_handler(CallbackQueryHandler(button_callback_handler))
 
-# ESTA PARTE É CRUCIAL PARA INICIAR O SERVIDOR DO WEBHOOK
+
 if __name__ == '__main__':
-    # O Render vai fornecer a porta via variável de ambiente PORT
-    port = int(os.environ.get("PORT", 8000)) # Use 8000 como padrão se PORT não estiver definida
+    port = int(os.environ.get("PORT", 8000))
 
-    # Inicia o webhook usando o método da Application
     application.run_webhook(
         listen="0.0.0.0",
         port=port,
-        url_path="/api/telegram/webhook", # O caminho que o Telegram vai chamar
-        webhook_url=WEBHOOK_URL # A URL completa do seu webhook
+        url_path="/api/telegram/webhook",
+        webhook_url=WEBHOOK_URL
     )
