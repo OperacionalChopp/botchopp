@@ -1,5 +1,4 @@
 import os
-from flask import Flask, request
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -12,13 +11,12 @@ from base_conhecimento.faq_data import faq_data
 # ✅ Substitua pelo seu token real!
 TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
 
-# Cria o Flask app
-flask_app = Flask(__name__)
+# A URL base do seu serviço no Render
+WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook"
 
 # Cria a aplicação do Telegram
-# Use Application.builder() para configurar o webhook
 application = (
-    ApplicationBuilder()
+    ApplicationBuilder( )
     .token(TOKEN)
     .build()
 )
@@ -39,19 +37,15 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Adiciona handler de texto
 application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
 
-# ✅ Rota do webhook que o Telegram vai chamar
-@flask_app.route('/api/telegram/webhook', methods=['POST']) # <--- Mantenha esta rota
-async def webhook():
-    # Processa a atualização do Telegram
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    await application.process_update(update)
-    return "ok"
+# ESTA PARTE É CRUCIAL PARA INICIAR O SERVIDOR DO WEBHOOK
+if __name__ == '__main__':
+    # O Render vai fornecer a porta via variável de ambiente PORT
+    port = int(os.environ.get("PORT", 8000)) # Use 8000 como padrão se PORT não estiver definida
 
-# ✅ Rota de teste opcional
-@flask_app.route('/', methods=['GET'])
-def home():
-    return "Bot CHOPP rodando com webhook! ✅"
-
-# Não inicie o polling se estiver usando webhook
-# if __name__ == '__main__':
-#     flask_app.run(host='0.0.0.0', port=os.environ.get("PORT", 5000))
+    # Inicia o webhook usando o método da Application
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path="/api/telegram/webhook", # O caminho que o Telegram vai chamar
+        webhook_url=WEBHOOK_URL # A URL completa do seu webhook
+    )
