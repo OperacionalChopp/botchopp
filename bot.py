@@ -16,7 +16,12 @@ TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
 flask_app = Flask(__name__)
 
 # Cria a aplicação do Telegram
-application = ApplicationBuilder().token(TOKEN).build()
+# Remova a linha que cria o Updater e configure o webhook diretamente
+application = (
+    ApplicationBuilder()
+    .token(TOKEN)
+    .build()
+)
 
 # Handler de mensagens
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -35,8 +40,9 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
 
 # ✅ Rota do webhook que o Telegram vai chamar
-@flask_app.route('/webhook', methods=['POST'])
+@flask_app.route('/api/telegram/webhook', methods=['POST']) # <-- Já corrigido, mantenha assim
 async def webhook():
+    # Processa a atualização do Telegram
     update = Update.de_json(request.get_json(force=True), application.bot)
     await application.process_update(update)
     return "ok"
@@ -46,3 +52,6 @@ async def webhook():
 def home():
     return "Bot CHOPP rodando com webhook! ✅"
 
+# Não inicie o polling se estiver usando webhook
+# if __name__ == '__main__':
+#     flask_app.run(host='0.0.0.0', port=os.environ.get("PORT", 5000))
