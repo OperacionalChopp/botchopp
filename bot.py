@@ -20,7 +20,6 @@ flask_app = Flask(__name__)
 application = (
     ApplicationBuilder()
     .token(TOKEN)
-    .webhook_url("https://botchopp.onrender.com/api/telegram/webhook" ) # <--- Adicione esta linha
     .build()
 )
 
