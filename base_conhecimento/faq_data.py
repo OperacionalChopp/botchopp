@@ -10,7 +10,7 @@ faq_data = [
             "- 🧠 Tirar uma dúvida com a IA\n\n"
             "É só pedir que eu trago a informação geladinha!"
         ),
-        "palavras_chave": ["oi", "olá", "começar", "início", "e aí", "opa"]
+        "palavras_chave": ["oi", "olá", "começar", "início", "e aí", "opa", "bom dia", "boa tarde", "boa noite", "fala", "saudação", "ajuda"]
     },
     {
         "pergunta": "Como saber quantos litros de chope preciso para o meu evento?",
@@ -25,7 +25,8 @@ faq_data = [
         "palavras_chave": [
             "quantidade de litros", "chopp", "cálculo de bebida", "planejamento de evento",
             "festa", "convidados", "consumo por pessoa", "duração do evento",
-            "estilo de consumo", "temperatura ambiente", "estimativa ideal", "chopp brahma"
+            "estilo de consumo", "temperatura ambiente", "estimativa ideal", "chopp brahma",
+            "litros", "quanto", "preciso", "cálculo", "evento", "chope", "cerveja", "barril"
         ]
     },
     {
@@ -33,7 +34,8 @@ faq_data = [
         "resposta": "🕘 Segunda a sexta: das 09h às 18h 🕗 Sábado: das 08h às 12h 🚫 Domingo: fechado",
         "palavras_chave": [
             "horário de funcionamento", "atendimento ao cliente", "segunda a sábado",
-            "horário comercial", "loja aberta", "expediente", "disponibilidade", "atendimento presencial"
+            "horário comercial", "loja aberta", "expediente", "disponibilidade", "atendimento presencial",
+            "horário", "hora", "funcionamento", "abre", "fecha", "atende", "que horas", "expediente"
         ]
     },
     {
@@ -42,7 +44,8 @@ faq_data = [
             "Por motivos de segurança, alguns documentos podem ser requisitados pela franquia para o empréstimo dos equipamentos (barril, chopeira e outros)."
         ),
         "palavras_chave": [
-            "documentos obrigatórios", "empréstimo de chopeira", "segurança", "franquia", "barril", "chopeira", "exigências"
+            "documentos obrigatórios", "empréstimo de chopeira", "segurança", "franquia", "barril", "chopeira", "exigências",
+            "documentos", "emprestar", "equipamento", "chopeira", "barril", "precisa"
         ]
     },
     {
@@ -52,7 +55,8 @@ faq_data = [
             "O pedido deve ser feito com pelo menos três dias de antecedência da data do evento."
         ),
         "palavras_chave": [
-            "loja mais próxima", "encontrar franquia", "localização", "CEP", "tempo de pedido", "antecedência mínima"
+            "loja mais próxima", "encontrar franquia", "localização", "CEP", "tempo de pedido", "antecedência mínima",
+            "loja", "onde", "próxima", "local", "endereço", "cep"
         ]
     },
     {
@@ -63,7 +67,8 @@ faq_data = [
         ),
         "palavras_chave": [
             "portfólio", "produtos disponíveis", "seleção", "carrinho", "chopp brahma",
-            "outras bebidas", "serviços adicionais", "tamanhos de barril", "festa"
+            "outras bebidas", "serviços adicionais", "tamanhos de barril", "festa",
+            "produtos", "disponíveis", "cardápio", "o que tem", "barril", "chope"
         ]
     },
     {
@@ -72,7 +77,8 @@ faq_data = [
             "Após escolher seus produtos, agende no site tanto a data de entrega quanto a de devolução. A Chopeira e demais itens são emprestados e devem ser devolvidos conforme o combinado."
         ),
         "palavras_chave": [
-            "agendamento", "entrega", "devolução", "chopeira", "barril", "data", "logística", "site", "organização"
+            "agendamento", "entrega", "devolução", "chopeira", "barril", "data", "logística", "site", "organização",
+            "agendar", "devolver", "retirar", "pegar", "entrega"
         ]
     },
     {
@@ -81,16 +87,18 @@ faq_data = [
             "O pagamento no site é feito via Cartão de Crédito à vista (Visa, Mastercard, Amex, Diners, Elo). Algumas lojas aceitam boleto — essa opção deve ser confirmada com a unidade responsável."
         ),
         "palavras_chave": [
-            "formas de pagamento", "cartão de crédito", "boleto", "bandeiras aceitas", "condições de compra", "confirmação"
+            "formas de pagamento", "cartão de crédito", "boleto", "bandeiras aceitas", "condições de compra", "confirmação",
+            "pagamento", "pagar", "como pagar", "cartão", "boleto", "dinheiro", "pix"
         ]
     },
     {
         "pergunta": "Como acessar a área de cadastro?",
         "resposta": (
             "Com a reformulação do site, é necessário criar um novo login e senha. Acesse: https://choppbrahmaexpress.com.br/customer/account/login/"
-        ),
+         ),
         "palavras_chave": [
-            "cadastro", "login", "senha", "reformulação", "conta de cliente", "atualização de dados"
+            "cadastro", "login", "senha", "reformulação", "conta de cliente", "atualização de dados",
+            "cadastrar", "acessar", "minha conta", "entrar"
         ]
     },
     {
@@ -99,7 +107,8 @@ faq_data = [
             "Os produtos estão sujeitos à disponibilidade de cada Loja Chopp Brahma Express. No site, ao inserir seu CEP, será exibido o portfólio e disponibilidade específicos da loja mais próxima."
         ),
         "palavras_chave": [
-            "disponibilidade regional", "produtos por loja", "portfólio por CEP", "variação de oferta", "região", "loja específica"
+            "disponibilidade regional", "produtos por loja", "portfólio por CEP", "variação de oferta", "região", "loja específica",
+            "disponibilidade", "região", "todos os produtos", "entrega"
         ]
     },
     {
@@ -108,7 +117,8 @@ faq_data = [
             "Sim! A disponibilidade depende da loja. Ao inserir o CEP no site, essa informação é indicada. Após confirmar o pedido, você também pode verificar com a loja responsável — o contato estará no e-mail de confirmação."
         ),
         "palavras_chave": [
-            "chopeiro", "contratação de serviço", "suporte técnico", "entrega", "disponibilidade", "CEP", "loja responsável"
+            "chopeiro", "contratação de serviço", "suporte técnico", "entrega", "disponibilidade", "CEP", "loja responsável",
+            "chopeiro", "contratar", "serviço"
         ]
     },
     {
@@ -117,7 +127,8 @@ faq_data = [
             "O acompanhamento é feito diretamente com a loja Chopp Brahma Express responsável, informada após a escolha do CEP. O contato estará no e-mail de confirmação/aprovação do pagamento."
         ),
         "palavras_chave": [
-            "status do pedido", "acompanhamento", "loja responsável", "confirmação", "telefone de contato", "CEP"
+            "status do pedido", "acompanhamento", "loja responsável", "confirmação", "telefone de contato", "CEP",
+            "pedido", "status", "acompanhar", "rastrear"
         ]
     },
     {
@@ -127,7 +138,8 @@ faq_data = [
             "Locais com escadas podem ter restrições. Também é possível retirar o pedido diretamente na loja."
         ),
         "palavras_chave": [
-            "entrega", "instalação", "técnico", "retirada na loja", "presença de responsável", "escadas", "frete", "logística"
+            "entrega", "instalação", "técnico", "retirada na loja", "presença de responsável", "escadas", "frete", "logística",
+            "como entrega", "entrega", "receber", "retirar"
         ]
     },
     {
@@ -136,16 +148,18 @@ faq_data = [
             "O valor do frete varia de acordo com o endereço informado no momento do pedido. A simulação é feita automaticamente no site."
         ),
         "palavras_chave": [
-            "valor de entrega", "cálculo de frete", "retirada", "endereço", "simulação", "site"
+            "valor de entrega", "cálculo de frete", "retirada", "endereço", "simulação", "site",
+            "frete", "valor", "entrega", "custo"
         ]
     },
     {
         "pergunta": "A compra inclui a Chopeira e barril?",
         "resposta": (
-            "Não. A compra é do Chopp. A Chopeira, o barril e os demais itens são emprestados gratuitamente — devem ser devolvidos conforme combinado com a loja."
+            "Não. A compra é do Chopp. A Chopeira, o barril e os demais itens são emprestados gratuitamente — devem ser devolvidos conforme o combinado com a loja."
         ),
         "palavras_chave": [
-            "empréstimo de equipamentos", "chopeira", "barril", "compra de chopp", "devolução", "política de uso"
+            "empréstimo de equipamentos", "chopeira", "barril", "compra de chopp", "devolução", "política de uso",
+            "inclui", "chopeira", "barril", "aluguel"
         ]
     },
     {
@@ -155,7 +169,8 @@ faq_data = [
             "A imagem no site é ilustrativa — a loja define o modelo ideal conforme o evento."
         ),
         "palavras_chave": [
-            "kit chopeira", "equipamentos inclusos", "cilindro de gás", "válvula", "montagem", "imagem ilustrativa"
+            "kit chopeira", "equipamentos inclusos", "cilindro de gás", "válvula", "montagem", "imagem ilustrativa",
+            "kit", "o que vem", "chopeira", "equipamentos"
         ]
     },
     {
@@ -164,7 +179,8 @@ faq_data = [
             "Verifique a voltagem do local (110V ou 220V), reserve uma mesa ou superfície firme próxima a uma tomada exclusiva e longe de fontes de calor."
         ),
         "palavras_chave": [
-            "instalação chopeira", "voltagem", "tomada exclusiva", "estrutura adequada", "calor", "elétrica"
+            "instalação chopeira", "voltagem", "tomada exclusiva", "estrutura adequada", "calor", "elétrica",
+            "instalar", "chopeira", "elétrica", "voltagem", "tomada"
         ]
     },
     {
@@ -174,7 +190,8 @@ faq_data = [
             "O ideal é manter dois dedos de espuma para preservar o aroma e a qualidade."
         ),
         "palavras_chave": [
-            "servir chopp", "colarinho", "copo 45 graus", "espuma", "técnica ideal", "sabor", "qualidade"
+            "servir chopp", "colarinho", "copo 45 graus", "espuma", "técnica ideal", "sabor", "qualidade",
+            "servir", "como servir", "chopp", "colarinho", "espuma"
         ]
     },
     {
@@ -183,7 +200,8 @@ faq_data = [
             "Caso perceba alteração no sabor ou qualidade do Chopp, entre em contato via inbox na página oficial do Facebook: www.facebook.com/ChoppBrahmaExpressBrasil/"
         ),
         "palavras_chave": [
-            "problema no chopp", "qualidade", "sabor alterado", "suporte", "atendimento", "Facebook", "reclamação"
+            "problema no chopp", "qualidade", "sabor alterado", "suporte", "atendimento", "Facebook", "reclamação",
+            "problema", "qualidade", "chopp", "sabor", "ruim"
         ]
     },
     {
@@ -192,7 +210,8 @@ faq_data = [
             "O prazo médio de validade do Chopp é de 10 dias após a fabricação. Após aberto e instalado, deve ser consumido em até 2 dias para garantir frescor e qualidade."
         ),
         "palavras_chave": [
-            "validade do chopp", "prazo médio", "consumo", "frescor", "qualidade", "tempo máximo"
+            "validade do chopp", "prazo médio", "consumo", "frescor", "qualidade", "tempo máximo",
+            "validade", "prazo", "chopp", "vence"
         ]
     },
     {
@@ -202,7 +221,8 @@ faq_data = [
             "A entrega adicional depende da disponibilidade e horário da loja."
         ),
         "palavras_chave": [
-            "pedido extra", "novo pedido", "produtos adicionais", "urgência", "loja responsável", "contato", "disponibilidade"
+            "pedido extra", "novo pedido", "produtos adicionais", "urgência", "loja responsável", "contato", "disponibilidade",
+            "mais chopp", "pedir mais", "extra", "faltou"
         ]
     },
     {
@@ -212,7 +232,8 @@ faq_data = [
             "Se o pagamento já tiver sido aprovado, o estorno pode levar até 3 meses. Caso o pedido já tenha sido entregue, não será possível cancelar."
         ),
         "palavras_chave": [
-            "cancelamento de pedido", "prazo para cancelar", "estorno", "entrega realizada", "loja responsável", "reembolso"
+            "cancelamento de pedido", "prazo para cancelar", "estorno", "entrega realizada", "loja responsável", "reembolso",
+            "cancelar", "pedido", "posso cancelar"
         ]
     },
     {
@@ -221,7 +242,8 @@ faq_data = [
             "💰 Ao realizar uma compra no site, 5% do valor pago volta como créditos na sua conta. Você poderá utilizá-los em compras futuras como forma de desconto."
         ),
         "palavras_chave": [
-            "choppback", "créditos de compra", "cashback", "desconto", "fidelidade", "programa de recompensas"
+            "choppback", "créditos de compra", "cashback", "desconto", "fidelidade", "programa de recompensas",
+            "choppback", "o que é", "crédito", "desconto"
         ]
     },
     {
@@ -230,7 +252,8 @@ faq_data = [
             "📝 Após fazer seu cadastro no site e realizar sua primeira compra, você já começa a participar automaticamente do programa Choppback."
         ),
         "palavras_chave": [
-            "cadastro", "choppback", "ativação automática", "primeira compra", "programa de fidelidade"
+            "cadastro", "choppback", "ativação automática", "primeira compra", "programa de fidelidade",
+            "cadastrar", "choppback", "como faço"
         ]
     },
     {
@@ -239,7 +262,8 @@ faq_data = [
             "✅ Todos os produtos vendidos no site estão elegíveis ao Choppback, desde que sua compra totalize R$50,00 ou mais (excluindo frete)."
         ),
         "palavras_chave": [
-            "produtos válidos", "mínimo de compra", "valor mínimo", "elegibilidade", "regra do programa", "choppback"
+            "produtos válidos", "mínimo de compra", "valor mínimo", "elegibilidade", "regra do programa", "choppback",
+            "elegível", "choppback", "quais produtos"
         ]
     },
     {
@@ -248,7 +272,8 @@ faq_data = [
             "🎯 Você ganha 5% do valor pago nos produtos por compra, com limite máximo de R$100,00 em crédito por pedido."
         ),
         "palavras_chave": [
-            "porcentagem", "limite de crédito", "valor máximo", "cálculo do benefício", "choppback"
+            "porcentagem", "limite de crédito", "valor máximo", "cálculo do benefício", "choppback",
+            "quanto ganho", "choppback", "limite"
         ]
     },
     {
@@ -257,7 +282,8 @@ faq_data = [
             "📊 Faça login com o e-mail cadastrado, clique em \"Choppback\" no menu à direita e confira seu saldo e extrato com todas as movimentações."
         ),
         "palavras_chave": [
-            "consulta de saldo", "extrato", "histórico de créditos", "painel de cliente", "login", "choppback"
+            "consulta de saldo", "extrato", "histórico de créditos", "painel de cliente", "login", "choppback",
+            "saldo", "extrato", "consultar", "ver choppback"
         ]
     },
     {
@@ -266,7 +292,8 @@ faq_data = [
             "🛍️ Ao finalizar a compra, na etapa de pagamento, você escolhe quantos créditos do Choppback quer utilizar como desconto."
         ),
         "palavras_chave": [
-            "usar créditos", "desconto", "etapa de pagamento", "aplicação do choppback", "choppback"
+            "usar créditos", "desconto", "etapa de pagamento", "aplicação do choppback", "choppback",
+            "usar", "créditos", "como usar"
         ]
     },
     {
@@ -275,7 +302,8 @@ faq_data = [
             "⏳ Sim. Todos os créditos têm validade de 180 dias a partir da data em que foram concedidos."
         ),
         "palavras_chave": [
-            "validade", "prazo", "expiração", "tempo de uso", "duração dos créditos", "choppback"
+            "validade", "prazo", "expiração", "tempo de uso", "duração dos créditos", "choppback",
+            "validade", "créditos", "expira"
         ]
     },
     {
@@ -284,7 +312,8 @@ faq_data = [
             "⌚ O crédito do Choppback é liberado em até 7 dias após o faturamento do pedido. Ele pode ser cancelado se o pagamento não for confirmado ou o pedido for incompleto."
         ),
         "palavras_chave": [
-            "tempo de liberação", "prazo de crédito", "confirmação", "regras", "atraso", "choppback"
+            "tempo de liberação", "prazo de crédito", "confirmação", "regras", "atraso", "choppback",
+            "disponível", "liberado", "quando"
         ]
     },
     {
@@ -293,7 +322,8 @@ faq_data = [
             "🛒 Os créditos do Choppback podem ser usados na compra de qualquer produto da loja online Chopp Brahma Express."
         ),
         "palavras_chave": [
-            "uso do crédito", "produtos disponíveis", "loja online", "aplicabilidade", "choppback"
+            "uso do crédito", "produtos disponíveis", "loja online", "aplicabilidade", "choppback",
+            "quais produtos", "usar créditos"
         ]
     },
     {
@@ -302,7 +332,8 @@ faq_data = [
             "☎️ Verifique se está logado com o e-mail correto e se os créditos ainda estão válidos. Se o problema persistir, envie um e-mail para atendimento@choppbrahmaexpress.com.br ou ligue para 0800 888 1021."
         ),
         "palavras_chave": [
-            "erro no uso", "suporte", "login", "atendimento", "contato", "créditos inválidos", "choppback"
+            "erro no uso", "suporte", "login", "atendimento", "contato", "créditos inválidos", "choppback",
+            "não usei", "problema", "créditos"
         ]
     },
     {
@@ -311,7 +342,8 @@ faq_data = [
             "🚫 Pagamentos feitos com Vale-Presente ou Voucher não geram crédito Choppback."
         ),
         "palavras_chave": [
-            "exclusão", "meios de pagamento", "voucher", "vale-presente", "regras de acúmulo", "choppback"
+            "exclusão", "meios de pagamento", "voucher", "vale-presente", "regras de acúmulo", "choppback",
+            "não acumula", "vale presente", "voucher"
         ]
     },
     {
@@ -320,7 +352,8 @@ faq_data = [
             "📦 Não. O crédito é calculado apenas sobre o valor dos produtos. O frete não entra no cálculo."
         ),
         "palavras_chave": [
-            "cálculo do crédito", "valor do frete", "produtos", "restrição", "regra", "choppback"
+            "cálculo do crédito", "valor do frete", "produtos", "restrição", "regra", "choppback",
+            "frete", "acumula", "crédito"
         ]
     },
     {
@@ -329,7 +362,8 @@ faq_data = [
             "🎚️ Sim! No momento do pagamento, você escolhe quanto dos seus créditos deseja aplicar — total ou parcial."
         ),
         "palavras_chave": [
-            "uso parcial", "controle do crédito", "pagamento flexível", "choppback"
+            "uso parcial", "controle do crédito", "pagamento flexível", "choppback",
+            "parte do crédito", "parcial"
         ]
     },
     {
@@ -338,7 +372,8 @@ faq_data = [
             "🎟️ Sim! Cupons e Choppback podem ser usados na mesma compra. O crédito será calculado sobre o valor com desconto."
         ),
         "palavras_chave": [
-            "cupom + crédito", "desconto conjunto", "regras de combinação", "promoção", "choppback"
+            "cupom + crédito", "desconto conjunto", "regras de combinação", "promoção", "choppback",
+            "cupom", "desconto", "junto"
         ]
     },
     {
@@ -347,7 +382,8 @@ faq_data = [
             "💳 Sim! Você pode usar parte dos créditos e completar o restante com qualquer método de pagamento disponível no site."
         ),
         "palavras_chave": [
-            "pagamento híbrido", "parcial", "complemento", "saldo restante", "choppback"
+            "pagamento híbrido", "parcial", "complemento", "saldo restante", "choppback",
+            "não suficiente", "completar", "outra forma"
         ]
     },
     {
@@ -356,7 +392,8 @@ faq_data = [
             "🧾 O valor total do crédito entra na sua conta de uma vez só, independente do número de parcelas. Mas será cancelado em caso de não confirmação de pagamento ou pedido incompleto."
         ),
         "palavras_chave": [
-            "parcelamento", "crédito total", "política de estorno", "bloqueio", "compra parcelada", "choppback"
+            "parcelamento", "crédito total", "política de estorno", "bloqueio", "compra parcelada", "choppback",
+            "parcelado", "parcelas", "crédito"
         ]
     },
     {
@@ -365,7 +402,8 @@ faq_data = [
             "🪙 O crédito será gerado apenas sobre a parte paga com outra forma (ex: cartão). Valores pagos com Choppback ou Vale-Presente não acumulam novo crédito."
         ),
         "palavras_chave": [
-            "forma de pagamento", "cálculo proporcional", "regra de acúmulo", "exceções", "choppback"
+            "forma de pagamento", "cálculo proporcional", "regra de acúmulo", "exceções", "choppback",
+            "vale presente", "choppback", "pagar com"
         ]
     },
     {
@@ -374,7 +412,8 @@ faq_data = [
             "🗓️ Não. Todo crédito gerado tem validade uniforme de 180 dias, independente do tipo de produto comprado."
         ),
         "palavras_chave": [
-            "validade unificada", "regra única", "produtos", "prazo", "choppback"
+            "validade unificada", "regra única", "produtos", "prazo", "choppback",
+            "validade diferente", "produtos"
         ]
     },
     {
@@ -383,7 +422,8 @@ faq_data = [
             "🚫 Os créditos gerados a partir daquela compra serão automaticamente cancelados e perderão a validade."
         ),
         "palavras_chave": [
-            "cancelamento", "estorno de crédito", "anulação", "política de devolução", "choppback"
+            "cancelamento", "estorno de crédito", "anulação", "política de devolução", "choppback",
+            "cancelar compra", "crédito"
         ]
     },
     {
@@ -392,16 +432,18 @@ faq_data = [
             "📉 Mesmo que o valor total ultrapasse R$2.000,00, o limite máximo por compra é de R$100,00 em créditos de Choppback."
         ),
         "palavras_chave": [
-            "limite por compra", "valor máximo", "restrição de crédito", "teto de benefício", "choppback"
+            "limite por compra", "valor máximo", "restrição de crédito", "teto de benefício", "choppback",
+            "limite", "r$2000", "acumular"
         ]
     },
     {
         "pergunta": "Posso usar meu saldo do Choppback em uma loja física?",
         "resposta": (
             "🛑 Não. O Choppback é exclusivo para compras online realizadas no site oficial: https://www.choppbrahmaexpress.com.br"
-        ),
+         ),
         "palavras_chave": [
-            "uso online", "restrição física", "site oficial", "loja digital", "exclusividade", "choppback"
+            "uso online", "restrição física", "site oficial", "loja digital", "exclusividade", "choppback",
+            "loja física", "usar na loja"
         ]
     },
     {
@@ -413,7 +455,8 @@ faq_data = [
             "🎯 Basta informar o endereço completo no seu pedido e confirmaremos a entrega."
         ),
         "palavras_chave": [
-            "entrega em brasília", "cobertura de regiões", "bairros atendidos", "atendimento por cidade", "chopp delivery", "região de atuação"
+            "entrega em brasília", "cobertura de regiões", "bairros atendidos", "atendimento por cidade", "chopp delivery", "região de atuação",
+            "região", "onde atendem", "local", "cidade", "bairro", "atendem", "minha região", "entregam"
         ]
     },
     {
@@ -425,7 +468,8 @@ faq_data = [
             "📦 Caso sua região não esteja listada, entre em contato para verificar a viabilidade da entrega."
         ),
         "palavras_chave": [
-            "áreas atendidas", "regiões de brasília", "cobertura geográfica", "cidades vizinhas", "bairros do df", "logística de entrega"
+            "áreas atendidas", "regiões de brasília", "cobertura geográfica", "cidades vizinhas", "bairros do df", "logística de entrega",
+            "regiões", "atendem", "onde entregam", "lista de regiões"
         ]
     }
 ]
