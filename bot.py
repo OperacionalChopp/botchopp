@@ -16,10 +16,11 @@ TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
 flask_app = Flask(__name__)
 
 # Cria a aplicação do Telegram
-# Remova a linha que cria o Updater e configure o webhook diretamente
+# Use Application.builder() para configurar o webhook
 application = (
     ApplicationBuilder()
     .token(TOKEN)
+    .webhook_url("https://botchopp.onrender.com/api/telegram/webhook" ) # <--- Adicione esta linha
     .build()
 )
 
@@ -40,7 +41,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
 
 # ✅ Rota do webhook que o Telegram vai chamar
-@flask_app.route('/api/telegram/webhook', methods=['POST']) # <-- Já corrigido, mantenha assim
+@flask_app.route('/api/telegram/webhook', methods=['POST']) # <--- Mantenha esta rota
 async def webhook():
     # Processa a atualização do Telegram
     update = Update.de_json(request.get_json(force=True), application.bot)
