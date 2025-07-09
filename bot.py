@@ -1,16 +1,16 @@
+# bot.py
+
 from flask import Flask, request
-import asyncio
 from telegram import Update
 from telegram.ext import Application, MessageHandler, ContextTypes, filters
 from base_conhecimento.faq_data import faq_data
 
-# 1) Configure seu bot
-TOKEN = "SEU_TOKEN_AQUI"
+TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"  # 👉 Coloque o token real aqui
 
-# 2) Crie a aplicação Telegram
-application = Application.builder().token(7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw).build()
+# Instancia o bot
+application = Application.builder().token(TOKEN).build()
 
-# 3) Adicione o handler de mensagens
+# Handler de mensagens
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text.lower()
 
@@ -25,17 +25,4 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Você pode perguntar sobre horário, formas de pagamento, região de atendimento, etc."
     )
 
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
-
-# 4) Crie o Flask para expor o webhook
-app = Flask(__name__)
-
-@app.route('/webhook', methods=['POST'])
-async def webhook():
-    if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), application.bot)
-        await application.process_update(update)
-    return "ok", 200
-
-# 5) Use gunicorn para rodar: gunicorn bot:app
-
+appl
