@@ -1,8 +1,8 @@
 from flask import Flask, request
 import requests
 
-TOKEN = "SEU_TOKEN_AQUI"  # Cole seu token do BotFather aqui
-URL = f"https://api.telegram.org/bot{7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw}/"
+TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"  # Cole seu token do BotFather aqui
+URL = f"https://api.telegram.org/bot{TOKEN}/"
 
 app = Flask(__name__)
 
