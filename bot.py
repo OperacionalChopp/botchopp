@@ -1,81 +1,88 @@
 TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
+
 import os
+import asyncio
+from http import HTTPStatus
+from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
+    Application,
     ContextTypes,
     MessageHandler,
     filters,
     CallbackQueryHandler
-)
+ )
 from base_conhecimento.faq_data import faq_data
 
-# ✅ Substitua pelo seu token real!
-TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
+# --- Configuração ---
+# Pega o token do ambiente do Render. Certifique-se de que a variável TELEGRAM_TOKEN está configurada lá.
+TOKEN = os.environ.get("7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw")
+PORT = int(os.environ.get("PORT", 8000))
 
-# A URL base do seu serviço no Render
-WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook"
+# --- Lista de Regiões Atendidas ---
+# Extraída da sua FAQ para fácil acesso e verificação.
+# Manter em minúsculas e sem acentos para facilitar a comparação.
+REGIOES_ATENDIDAS = [
+    "agua quente", "aguas claras", "arniqueira", "brazlandia", "ceilandia",
+    "gama", "guara", "nucleo bandeirante", "park way", "recanto das emas",
+    "riacho fundo", "riacho fundo ii", "samambaia", "santa maria",
+    "scia/estrutural", "sia", "sol nascente / por do sol", "taguatinga",
+    "valparaiso de goias", "vicente pires"
+]
 
-# Cria a aplicação do Telegram
-application = (
-    ApplicationBuilder( )
-    .token(TOKEN)
-    .build()
-)
+# --- Lógica do Bot (Handlers) ---
 
-# Handler de mensagens
+# Handler de mensagens (versão atualizada e mais inteligente)
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto_usuario = update.message.text.lower()
     
-    # Lista para armazenar as FAQs que correspondem, com uma pontuação
-    scored_faqs = []
+    # --- LÓGICA NOVA: Verificar se é uma pergunta sobre região específica ---
+    # Normaliza o texto do usuário (remove acentos comuns) para comparação
+    texto_normalizado = texto_usuario.replace('á', 'a').replace('â', 'a').replace('ã', 'a').replace('é', 'e').replace('ê', 'e').replace('í', 'i').replace('ó', 'o').replace('ô', 'o').replace('ú', 'u').replace('ç', 'c')
+
+    for regiao in REGIOES_ATENDIDAS:
+        # Verifica se o nome da região está na mensagem do usuário
+        if regiao in texto_normalizado:
+            # Se encontrou a região, dá uma resposta direta e encerra a função
+            await update.message.reply_text(
+                f"Sim, atendemos em {regiao.title()}! ✅\n"
+                "Pode fazer seu pedido pelo site que entregamos aí."
+            )
+            return # Encerra a função aqui para não continuar procurando outras respostas
+
+    # --- LÓGICA ANTIGA (se não for uma pergunta sobre região) ---
+    # Se o código chegou até aqui, significa que não era uma pergunta sobre uma região específica.
+    # Então, ele continua com a lógica de palavras-chave e desambiguação que já tínhamos.
     
-    # Tokeniza o texto do usuário para correspondência de palavras inteiras
-    # Usamos set para eficiência e para lidar com palavras únicas
+    scored_faqs = []
     palavras_do_usuario = set(texto_usuario.split()) 
 
     for item in faq_data:
         score = 0
-        # Tokeniza as palavras-chave da FAQ
-        # Garante que estamos comparando palavras inteiras, não substrings
         palavras_chave_item = set(item["palavras_chave"])
-
-        # Calcula a interseção entre as palavras do usuário e as palavras-chave da FAQ
         intersecao = palavras_do_usuario.intersection(palavras_chave_item)
-        
-        # A pontuação é o número de palavras-chave que correspondem
         score = len(intersecao)
-
-        # Se houver alguma correspondência, adiciona à lista com a pontuação
         if score > 0:
             scored_faqs.append({"faq": item, "score": score})
 
-    # Ordena as FAQs encontradas pela pontuação (do maior para o menor)
     scored_faqs.sort(key=lambda x: x["score"], reverse=True)
 
-    # Filtra as FAQs com a pontuação máxima para lidar com desambiguação
     if scored_faqs:
         max_score = scored_faqs[0]["score"]
-        # Pega todas as FAQs que têm a pontuação máxima
         top_matched_faqs = [s["faq"] for s in scored_faqs if s["score"] == max_score]
     else:
-        top_matched_faqs = [] # Nenhuma FAQ encontrada
+        top_matched_faqs = []
 
-    # Lógica de resposta
     if not top_matched_faqs:
-        # Nenhuma FAQ encontrada
         await update.message.reply_text(
             "Desculpe, não entendi. 🤔\n"
-            "Você pode perguntar sobre horário, formas de pagamento, região de atendimento, etc."
+            "Você pode perguntar sobre horário, formas de pagamento, ou se atendemos em uma região específica."
         )
     elif len(top_matched_faqs) == 1:
-        # Apenas uma FAQ com a maior pontuação, responde diretamente
         await update.message.reply_text(top_matched_faqs[0]["resposta"])
     else:
-        # Múltiplas FAQs com a mesma maior pontuação, oferece opções com botões
         keyboard = []
         for faq in top_matched_faqs:
-            # Usa o ID da FAQ como callback_data para evitar o limite de 64 bytes
             keyboard.append([InlineKeyboardButton(faq["pergunta"], callback_data=f"faq_id_{faq['id']}")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -84,46 +91,56 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=reply_markup
         )
 
-# Novo handler para cliques em botões inline
 async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() # Responde ao callback para remover o "carregando" no Telegram
-
+    await query.answer()
     callback_data = query.data
     
     if callback_data.startswith("faq_id_"):
-        # Extrai o ID da FAQ do callback_data
         faq_id_selecionado = int(callback_data[len("faq_id_"):])
-        
-        # Encontra a FAQ correspondente na sua base de conhecimento pelo ID
         for item in faq_data:
             if item["id"] == faq_id_selecionado:
-                # Mude esta linha:
-                # await query.edit_message_text(text=item["resposta"]) # <-- REMOVA ESTA LINHA
-                
-                # Adicione esta linha para enviar uma NOVA mensagem com a resposta
-                await query.message.reply_text(text=item["resposta"]) 
-                
-                # Opcional: Se quiser remover os botões da mensagem original após a escolha
-                # await query.edit_message_reply_markup(reply_markup=None)
-                
+                await query.message.reply_text(text=item["resposta"])
+                # Opcional: remove os botões da mensagem original após a escolha
+                await query.edit_message_reply_markup(reply_markup=None)
                 return
-        
-        await query.message.reply_text(text="Desculpe, não consegui encontrar a resposta para essa opção.") # Mude aqui também
+        await query.message.reply_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
 
+# --- Configuração da Aplicação Telegram e Servidor Web (Flask) ---
+# Inicializa a aplicação PTB
+ptb = Application.builder().token(TOKEN).build()
 
-# Adiciona handler de texto
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
-# Adiciona o novo handler para callbacks de botões
-application.add_handler(CallbackQueryHandler(button_callback_handler))
+# Adiciona os handlers
+ptb.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
+ptb.add_handler(CallbackQueryHandler(button_callback_handler))
 
+# Inicializa o servidor Flask
+flask_app = Flask(__name__)
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 8000))
+@flask_app.route("/api/telegram/webhook", methods=["POST"])
+async def telegram_webhook():
+    """Lida com as atualizações do Telegram."""
+    await ptb.update_queue.put(Update.de_json(request.get_json(force=True), ptb.bot))
+    return Response(status=HTTPStatus.OK)
 
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path="/api/telegram/webhook",
-        webhook_url=WEBHOOK_URL
-    )
+@flask_app.route("/health", methods=["GET"])
+def health_check():
+    """Rota para o UptimeRobot manter o bot acordado."""
+    return "Bot is healthy and running!", HTTPStatus.OK
+
+async def main():
+    """Função principal para configurar o webhook."""
+    # O Render define o nome do host automaticamente. Se não estiver no Render, use a URL completa.
+    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME' )}/api/telegram/webhook"
+    await ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    # Configura o webhook e inicia o loop de eventos do PTB
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        loop.create_task(main())
+    else:
+        loop.run_until_complete(main())
+    
+    # O Gunicorn vai rodar o 'flask_app', então não precisamos de 'flask_app.run()' aqui
+    # O código acima garante que o webhook seja configurado antes do Gunicorn iniciar.
