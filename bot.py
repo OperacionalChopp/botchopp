@@ -32,33 +32,36 @@ REGIOES_ATENDIDAS = [
 
 # --- Lógica do Bot (Handlers) ---
 
-# Handler de mensagens (versão atualizada e mais inteligente)
+# Handler de mensagens (versão corrigida e mais robusta)
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto_usuario = update.message.text.lower()
     
-    # --- LÓGICA NOVA: Verificar se é uma pergunta sobre região específica ---
+    # --- LÓGICA NOVA E PRIORITÁRIA: Verificar se é uma pergunta sobre região específica ---
     # Normaliza o texto do usuário (remove acentos comuns) para comparação
     texto_normalizado = texto_usuario.replace('á', 'a').replace('â', 'a').replace('ã', 'a').replace('é', 'e').replace('ê', 'e').replace('í', 'i').replace('ó', 'o').replace('ô', 'o').replace('ú', 'u').replace('ç', 'c')
 
-    for regiao in REGIOES_ATENDIDAS:
-        # Verifica se o nome da região está na mensagem do usuário
-        if regiao in texto_normalizado:
-            # Se encontrou a região, dá uma resposta direta e encerra a função
-            await update.message.reply_text(
-                f"Sim, atendemos em {regiao.title()}! ✅\n"
-                "Pode fazer seu pedido pelo site que entregamos aí."
-            )
-            return # Encerra a função aqui para não continuar procurando outras respostas
+    # Verifica se a pergunta contém palavras como "atende", "entrega", "região"
+    contem_palavra_de_regiao = any(palavra in texto_normalizado for palavra in ["atende", "entrega", "regiao", "bairro", "cidade"])
 
-    # --- LÓGICA ANTIGA (se não for uma pergunta sobre região) ---
-    # Se o código chegou até aqui, significa que não era uma pergunta sobre uma região específica.
-    # Então, ele continua com a lógica de palavras-chave e desambiguação que já tínhamos.
-    
+    regiao_encontrada = None
+    for regiao in REGIOES_ATENDIDAS:
+        if regiao in texto_normalizado:
+            regiao_encontrada = regiao
+            break # Para na primeira região que encontrar
+
+    # Se a pergunta contém uma palavra de região E o nome de uma região, responde diretamente
+    if contem_palavra_de_regiao and regiao_encontrada:
+        await update.message.reply_text(
+            f"Sim, atendemos em {regiao_encontrada.title()}! ✅\n"
+            "Pode fazer seu pedido pelo site que entregamos aí."
+        )
+        return # Encerra a função aqui
+
+    # --- LÓGICA DE PONTUAÇÃO (se não for uma pergunta sobre região) ---
     scored_faqs = []
     palavras_do_usuario = set(texto_usuario.split()) 
 
     for item in faq_data:
-        score = 0
         palavras_chave_item = set(item["palavras_chave"])
         intersecao = palavras_do_usuario.intersection(palavras_chave_item)
         score = len(intersecao)
@@ -67,18 +70,17 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     scored_faqs.sort(key=lambda x: x["score"], reverse=True)
 
-    if scored_faqs:
-        max_score = scored_faqs[0]["score"]
-        top_matched_faqs = [s["faq"] for s in scored_faqs if s["score"] == max_score]
-    else:
-        top_matched_faqs = []
-
-    if not top_matched_faqs:
+    if not scored_faqs:
         await update.message.reply_text(
             "Desculpe, não entendi. 🤔\n"
             "Você pode perguntar sobre horário, formas de pagamento, ou se atendemos em uma região específica."
         )
-    elif len(top_matched_faqs) == 1:
+        return
+
+    max_score = scored_faqs[0]["score"]
+    top_matched_faqs = [s["faq"] for s in scored_faqs if s["score"] == max_score]
+
+    if len(top_matched_faqs) == 1:
         await update.message.reply_text(top_matched_faqs[0]["resposta"])
     else:
         keyboard = []
