@@ -616,7 +616,25 @@ faq_data = [
         "facilidade instalação", "pré-requisitos instalação",
         "mesa vidro chopeira"
     ]
+},
+    {
+    "id": 51,
+    "pergunta": "Como funciona a carta de crédito em caso de devolução de barril lacrado?",
+    "resposta": (
+        "Caso a compra de um barril volte com barril LACRADO, quando voltar a chopeira e o barril da retirada, enviaremos a carta de crédito referente ao valor da litragem, que poderá ser utilizada novamente em até 90 dias."
+    ),
+    "palavras_chave": [
+        "carta de crédito", "barril lacrado", "devolução barril",
+        "devolver barril lacrado", "crédito devolução",
+        "validade carta de crédito", "prazo carta de crédito",
+        "como funciona carta de crédito", "litragem devolução",
+        "retorno barril", "retirada barril", "cancelamento barril",
+        "reembolso barril", "troca barril lacrado", "compra barril",
+        "devolução chopeira", "retorno chopeira", "frete devolução",
+        "política devolução barril", "condições carta de crédito"
+    ]
 }
+
 
 
 
