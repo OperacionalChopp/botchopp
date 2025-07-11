@@ -1,5 +1,3 @@
-TOKEN = "7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw"
-
 import os
 import asyncio
 from http import HTTPStatus
