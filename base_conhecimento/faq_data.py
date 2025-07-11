@@ -516,5 +516,25 @@ faq_data = [
             "áreas atendidas", "regiões de brasília", "cobertura geográfica", "cidades vizinhas", "bairros do df", "logística de entrega",
             "regiões", "atendem", "onde entregam", "lista de regiões"
         ]
+    },
+    {
+        "id": 46,  # <--- Novo ID único
+        "pergunta": "Qual o preço e os descontos para o Chopp Brahma?",
+        "resposta": (
+            "🍻 Com certeza! Temos várias opções pra você garantir seu Chopp Brahma geladinho com desconto — e o melhor, entregue direto na sua casa, prontinho pra servir:\n\n"
+            "30L: de R$ 564,00 por R$ 535,80 (5% OFF)\n\n"
+            "50L: de R$ 940,00 por R$ 846,00 (10% OFF)\n\n"
+            "100L: de R$ 1.880,00 por R$ 1.692,00 (10% OFF)\n\n"
+            "150L: de R$ 2.820,00 por R$ 2.397,00 (15% OFF)\n\n"
+            "200L: de R$ 3.760,00 por R$ 3.008,00 (20% OFF)\n\n"
+            "250L: de R$ 4.700,00 por R$ 3.760,00 (20% OFF)\n\n"
+            "300L: de R$ 5.640,00 por R$ 4.512,00 (20% OFF)\n\n"
+            "⚠️ Lembre-se: os valores podem variar, então sempre consulte o site para confirmar — a promoção é válida enquanto durar a oferta por lá! 😉"
+        ),
+        "palavras_chave": [
+            "preço", "preços", "valor", "valores", "custo", "desconto", "descontos", 
+            "promoção", "oferta", "quanto custa", "tabela", "litro", "litros",
+            "30l", "50l", "100l", "150l", "200l", "250l", "300l"
+        ]
     }
-]
+] 
