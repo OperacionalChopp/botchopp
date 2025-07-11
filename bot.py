@@ -17,7 +17,7 @@ from base_conhecimento.faq_data import faq_data
 
 # --- Configuração ---
 # Pega o token do ambiente do Render. Certifique-se de que a variável TELEGRAM_TOKEN está configurada lá.
-TOKEN = os.environ.get("7561248614:AAHz-PCTNcgj5oyFei0PgNnmlwvSu4NSqfw")
+TOKEN = os.environ.get("7561248614:AAErBhdJ2untqbtF2YEaTIgOJexuKyhzgKg")
 PORT = int(os.environ.get("PORT", 8000))
 
 # --- Lista de Regiões Atendidas ---
