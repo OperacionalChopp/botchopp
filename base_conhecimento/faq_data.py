@@ -633,9 +633,34 @@ faq_data = [
         "devolução chopeira", "retorno chopeira", "frete devolução",
         "política devolução barril", "condições carta de crédito"
     ]
+},
+    {
+    "id": 52,
+    "pergunta": "Como funciona o suporte SOS? Horários, atendimento e contatos?",
+    "resposta": (
+        "Nosso suporte SOS funciona nos seguintes dias e horários:\n"
+        "- Quinta-feira: até 20h\n"
+        "- Sexta-feira: até 22h\n"
+        "- Sábado: até 22h\n"
+        "- Domingo: até 18h\n\n"
+        "Pedidos com encomenda de ENTREGA são atendidos pelo SOS presencialmente.\n"
+        "Pedidos de RETIRADA são atendidos por chamada de vídeo, *exceto em casos que realmente seja necessária a nossa ida,* como quando a chopeira não funciona ou o gás acaba.\n\n"
+        "Nosso suporte atende apenas dentro do DF — não atendemos entorno.\n\n"
+        "📞 Telefone SOS Loja: (61) 99451-4488\n"
+        "📞 Suporte Ambev: 0800 888 1021 (domingo a domingo, das 9h às 23h)\n\n"
+        "🔗 Links úteis:\n"
+        "- [Link Site](https://qr.me-qr.com/l/sites)\n"
+        "- [Zap SOS](https://qr.me-qr.com/l/sos-zap)\n"
+        "- [Vídeo SOS](https://qr.me-qr.com/l/sos-video)"
+    ),
+    "palavras_chave": [
+        "suporte SOS", "SOS", "telefone SOS", "zap SOS", "vídeo SOS",
+        "suporte emergência", "contato SOS", "horário SOS",
+        "funcionamento SOS", "emergência chope", "chopeira não funciona",
+        "gás chope acabou", "suporte presencial", "suporte retirada",
+        "atendimento SOS", "Ambev suporte", "link site",
+        "whatsapp SOS", "chamada vídeo SOS", "SOS Brasília", "SOS DF"
+    ]
 }
-
-
-
 
 ]
