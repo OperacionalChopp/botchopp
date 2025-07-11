@@ -517,8 +517,8 @@ faq_data = [
             "regiões", "atendem", "onde entregam", "lista de regiões"
         ]
     },
-    {
-        "id": 46,  # <--- Novo ID único
+ {
+        "id": 46,
         "pergunta": "Qual o preço e os descontos para o Chopp Brahma?",
         "resposta": (
             "🍻 Com certeza! Temos várias opções pra você garantir seu Chopp Brahma geladinho com desconto — e o melhor, entregue direto na sua casa, prontinho pra servir:\n\n"
@@ -537,4 +537,4 @@ faq_data = [
             "30l", "50l", "100l", "150l", "200l", "250l", "300l"
         ]
     }
-] 
+]
