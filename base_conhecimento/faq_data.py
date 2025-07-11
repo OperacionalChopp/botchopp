@@ -575,6 +575,49 @@ faq_data = [
         "precisa comprovante", "posso retirar", "coleta de pedido",
         "endereço de retirada"
     ]
+},
+    {
+    "id": 49,
+    "pergunta": "Quais são as regras para devolução de barril lacrado?",
+    "resposta": (
+        "Regras para Devolução de Barril Lacrado:\n\n"
+        "Será emitida uma carta de crédito, com validade de até 90 dias após a coleta, com valor baseado no preço atual do chopp.\n\n"
+        "Para solicitações feitas com 7 dias de antecedência do evento, será cobrada uma taxa adicional de frete, caso haja entrega."
+    ),
+    "palavras_chave": [
+        "devolução", "devolver barril", "regras devolução",
+        "carta de crédito", "validade carta de crédito", "barril lacrado",
+        "troca de barril", "cancelamento", "reembolso", "política devolução",
+        "taxa de devolução", "taxa de frete", "coleta barril",
+        "retorno de barril", "chopp devolução", "como devolver",
+        "prazo devolução", "valor devolução", "frete devolução",
+        "antecedência devolução"
+    ]
+},
+    {
+    "id": 50,
+    "pergunta": "Quais são as recomendações para instalação da chopeira?",
+    "resposta": (
+        "Recomendações da Brahma Express para facilidade em momento de instalação:\n\n"
+        "° Tenha extensão exclusiva para chopeira preparada para o dia de instalação\n"
+        "° Local definido com mesa que possa suportar nossa chopeira (NÃO PODE SER MESA DE VIDRO)\n"
+        "° No local onde irá ficar nosso produto, tem escadas? Elevador? Por favor nos informe\n"
+        "° Recomendamos um acesso fácil e sem obstruções no dia da instalação, para que ocorra com fluidez, rapidez e otimização"
+    ),
+    "palavras_chave": [
+        "instalação chopeira", "recomendações instalação",
+        "preparar instalação", "como instalar chopeira",
+        "espaço para chopeira", "mesa para chopeira",
+        "extensão elétrica", "tomada chopeira",
+        "escadas instalação", "elevador instalação",
+        "local instalação", "dicas instalação chopeira",
+        "orientações instalação", "acesso instalação",
+        "chopeira elétrica", "instalação brahma express",
+        "facilidade instalação", "pré-requisitos instalação",
+        "mesa vidro chopeira"
+    ]
 }
+
+
 
 ]
