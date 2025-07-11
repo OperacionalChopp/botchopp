@@ -1,8 +1,6 @@
 import os
 import asyncio
-from dotenv import load_dotenv  # Adicionado para carregar o arquivo .env
 
-load_dotenv()  # Carrega as variáveis do arquivo .env para o ambiente
 
 from http import HTTPStatus
 from flask import Flask, request, Response
