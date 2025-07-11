@@ -536,5 +536,28 @@ faq_data = [
             "promoção", "oferta", "quanto custa", "tabela", "litro", "litros",
             "30l", "50l", "100l", "150l", "200l", "250l", "300l"
         ]
-    }
+    }, 
+    {
+    "id": 47,
+    "pergunta": "Como funciona a logística de entrega e quais os horários?",
+    "resposta": (
+        "Nossa logística de entrega é feita por rotas. Entregamos de acordo com o endereço dos pedidos, por isso NÃO FAZEMOS AGENDAMENTO DE HORÁRIO.\n\n"
+        "🚛 Rotas de segunda a sexta:\n"
+        "- Rotas da manhã: entregas realizadas entre 9:30 a 13:00.\n"
+        "- Rotas da tarde: entregas realizadas entre 14:00 a 19:00.\n"
+        "Obs: excepcionalmente nas sextas-feiras a rota da tarde pode se estender para além das 19h de acordo com a quantidade de pedidos.\n\n"
+        "🚛 Rotas de sábado:\n"
+        "- ENTREGAS REALIZADAS ENTRE 09:00 a 14:00"
+    ),
+    "palavras_chave": [
+        "logística de entrega", "horário de entrega", "horários de entrega",
+        "rotas de entrega", "entrega programada", "agendamento de entrega",
+        "dia de entrega", "entregas segunda a sexta", "entregas sábado",
+        "prazo de entrega", "funcionamento entrega", "quando entregam",
+        "qual horário entrega", "que horas entregam", "horários rotas",
+        "turno da manhã", "turno da tarde", "entrega final de semana",
+        "entrega sexta-feira", "horário agendado"
+    ]
+}
+
 ]
