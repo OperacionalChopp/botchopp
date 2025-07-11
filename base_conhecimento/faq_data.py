@@ -558,6 +558,23 @@ faq_data = [
         "turno da manhã", "turno da tarde", "entrega final de semana",
         "entrega sexta-feira", "horário agendado"
     ]
+},
+    {
+    "id": 48,
+    "pergunta": "Como funciona a retirada de pedidos? Documentos, dias e horários?",
+    "resposta": (
+        "Para retirada é necessário apresentar um documento com foto e um comprovante de residência.\n\n"
+        "📅 Retirada de segunda a sexta-feira: das 9h às 18h.\n"
+        "📅 Retirada aos sábados: das 9h às 12h."
+    ),
+    "palavras_chave": [
+        "retirada", "retirar pedido", "como retirar", "documento para retirada",
+        "comprovante de residência", "retirada segunda a sexta", "retirada sábado",
+        "dias de retirada", "horário de retirada", "retirada balcão",
+        "ponto de retirada", "horários balcão", "precisa documento",
+        "precisa comprovante", "posso retirar", "coleta de pedido",
+        "endereço de retirada"
+    ]
 }
 
 ]
