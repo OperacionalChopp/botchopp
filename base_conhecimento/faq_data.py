@@ -17,7 +17,7 @@ faq_data = [
         "id": 2,
         "pergunta": "Como saber quantos litros de chope preciso para o meu evento?",
         "resposta": (
-            "A recomendação inicial é 2 litros por pessoa em eventos de até 4 horas. Para um cálculo mais preciso, utilize a Calculadora da Chopp Brahma Express: "
+            "A recomendação inicial é 2 litros por pessoa em eventos de até 4 horas. Para um cálculo mais preciso, utilize a Calculadora da Chopp Brahma Express: https://www.choppbrahmaexpress.com.br/calculadora"
             "1️⃣ Informe o número de convidados "
             "2️⃣ Escolha a duração (2h, 4h, 6h ou mais) "
             "3️⃣ Indique o estilo de consumo: moderado, normal ou intenso "
