@@ -1,7 +1,8 @@
 
-
 import os
 import asyncio
+from http import HTTPStatus
+from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -10,12 +11,12 @@ from telegram.ext import (
     filters,
     CallbackQueryHandler,
     CommandHandler
-)
+ )
 from base_conhecimento.faq_data import faq_data
 
 # --- Configuração ---
-# Pega o token diretamente do ambiente do Render.
 TOKEN = os.environ.get("7561248614:AAErBhdJ2untqbtF2YEaTIgOJexuKyhzgKg")
+PORT = int(os.environ.get("PORT", 8000))
 
 # --- Lista de Regiões Atendidas ---
 REGIOES_ATENDIDAS = [
@@ -101,20 +102,31 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
                 return
         await query.message.reply_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
 
-def main():
-    """Inicia o bot em modo polling."""
-    if not TOKEN:
-        print("ERRO: Token do Telegram não encontrado. Verifique suas variáveis de ambiente.")
-        return
+# --- Configuração da Aplicação e Servidor ---
+ptb = Application.builder().token(TOKEN).build()
 
-    application = Application.builder().token(TOKEN).build()
+ptb.add_handler(CommandHandler("start", start_command))
+ptb.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
+ptb.add_handler(CallbackQueryHandler(button_callback_handler))
 
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
-    application.add_handler(CallbackQueryHandler(button_callback_handler))
+flask_app = Flask(__name__) # <--- AQUI ESTÁ A VARIÁVEL QUE O GUNICORN PROCURA
 
-    print("Bot iniciado em modo polling...")
-    application.run_polling()
+@flask_app.route("/api/telegram/webhook", methods=["POST"])
+async def telegram_webhook():
+    await ptb.update_queue.put(Update.de_json(request.get_json(force=True), ptb.bot))
+    return Response(status=HTTPStatus.OK)
+
+@flask_app.route("/health", methods=["GET"])
+def health_check():
+    return "Bot is healthy and running!", HTTPStatus.OK
+
+async def main():
+    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME' )}/api/telegram/webhook"
+    await ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    main()
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        loop.create_task(main())
+    else:
+        loop.run_until_complete(main())
