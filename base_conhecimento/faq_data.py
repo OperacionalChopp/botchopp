@@ -517,7 +517,7 @@ faq_data = [
             "regiões", "atendem", "onde entregam", "lista de regiões"
         ]
     },
- {
+     {
         "id": 46,
         "pergunta": "Qual o preço e os descontos para o Chopp Brahma?",
         "resposta": (
@@ -536,131 +536,130 @@ faq_data = [
             "promoção", "oferta", "quanto custa", "tabela", "litro", "litros",
             "30l", "50l", "100l", "150l", "200l", "250l", "300l"
         ]
-    }, 
+    },  # <--- VÍRGULA ADICIONADA AQUI
     {
-    "id": 47,
-    "pergunta": "Como funciona a logística de entrega e quais os horários?",
-    "resposta": (
-        "Nossa logística de entrega é feita por rotas. Entregamos de acordo com o endereço dos pedidos, por isso NÃO FAZEMOS AGENDAMENTO DE HORÁRIO.\n\n"
-        "🚛 Rotas de segunda a sexta:\n"
-        "- Rotas da manhã: entregas realizadas entre 9:30 a 13:00.\n"
-        "- Rotas da tarde: entregas realizadas entre 14:00 a 19:00.\n"
-        "Obs: excepcionalmente nas sextas-feiras a rota da tarde pode se estender para além das 19h de acordo com a quantidade de pedidos.\n\n"
-        "🚛 Rotas de sábado:\n"
-        "- ENTREGAS REALIZADAS ENTRE 09:00 a 14:00"
-    ),
-    "palavras_chave": [
-        "logística de entrega", "horário de entrega", "horários de entrega",
-        "rotas de entrega", "entrega programada", "agendamento de entrega",
-        "dia de entrega", "entregas segunda a sexta", "entregas sábado",
-        "prazo de entrega", "funcionamento entrega", "quando entregam",
-        "qual horário entrega", "que horas entregam", "horários rotas",
-        "turno da manhã", "turno da tarde", "entrega final de semana",
-        "entrega sexta-feira", "horário agendado"
-    ]
-},
+        "id": 47,
+        "pergunta": "Como funciona a logística de entrega e quais os horários?",
+        "resposta": (
+            "Nossa logística de entrega é feita por rotas. Entregamos de acordo com o endereço dos pedidos, por isso NÃO FAZEMOS AGENDAMENTO DE HORÁRIO.\n\n"
+            "🚛 Rotas de segunda a sexta:\n"
+            "- Rotas da manhã: entregas realizadas entre 9:30 a 13:00.\n"
+            "- Rotas da tarde: entregas realizadas entre 14:00 a 19:00.\n"
+            "Obs: excepcionalmente nas sextas-feiras a rota da tarde pode se estender para além das 19h de acordo com a quantidade de pedidos.\n\n"
+            "🚛 Rotas de sábado:\n"
+            "- ENTREGAS REALIZADAS ENTRE 09:00 a 14:00"
+        ),
+        "palavras_chave": [
+            "logística de entrega", "horário de entrega", "horários de entrega",
+            "rotas de entrega", "entrega programada", "agendamento de entrega",
+            "dia de entrega", "entregas segunda a sexta", "entregas sábado",
+            "prazo de entrega", "funcionamento entrega", "quando entregam",
+            "qual horário entrega", "que horas entregam", "horários rotas",
+            "turno da manhã", "turno da tarde", "entrega final de semana",
+            "entrega sexta-feira", "horário agendado"
+        ]
+    },
     {
-    "id": 48,
-    "pergunta": "Como funciona a retirada de pedidos? Documentos, dias e horários?",
-    "resposta": (
-        "Para retirada é necessário apresentar um documento com foto e um comprovante de residência.\n\n"
-        "📅 Retirada de segunda a sexta-feira: das 9h às 18h.\n"
-        "📅 Retirada aos sábados: das 9h às 12h."
-    ),
-    "palavras_chave": [
-        "retirada", "retirar pedido", "como retirar", "documento para retirada",
-        "comprovante de residência", "retirada segunda a sexta", "retirada sábado",
-        "dias de retirada", "horário de retirada", "retirada balcão",
-        "ponto de retirada", "horários balcão", "precisa documento",
-        "precisa comprovante", "posso retirar", "coleta de pedido",
-        "endereço de retirada"
-    ]
-},
+        "id": 48,
+        "pergunta": "Como funciona a retirada de pedidos? Documentos, dias e horários?",
+        "resposta": (
+            "Para retirada é necessário apresentar um documento com foto e um comprovante de residência.\n\n"
+            "📅 Retirada de segunda a sexta-feira: das 9h às 18h.\n"
+            "📅 Retirada aos sábados: das 9h às 12h."
+        ),
+        "palavras_chave": [
+            "retirada", "retirar pedido", "como retirar", "documento para retirada",
+            "comprovante de residência", "retirada segunda a sexta", "retirada sábado",
+            "dias de retirada", "horário de retirada", "retirada balcão",
+            "ponto de retirada", "horários balcão", "precisa documento",
+            "precisa comprovante", "posso retirar", "coleta de pedido",
+            "endereço de retirada"
+        ]
+    },
     {
-    "id": 49,
-    "pergunta": "Quais são as regras para devolução de barril lacrado?",
-    "resposta": (
-        "Regras para Devolução de Barril Lacrado:\n\n"
-        "Será emitida uma carta de crédito, com validade de até 90 dias após a coleta, com valor baseado no preço atual do chopp.\n\n"
-        "Para solicitações feitas com 7 dias de antecedência do evento, será cobrada uma taxa adicional de frete, caso haja entrega."
-    ),
-    "palavras_chave": [
-        "devolução", "devolver barril", "regras devolução",
-        "carta de crédito", "validade carta de crédito", "barril lacrado",
-        "troca de barril", "cancelamento", "reembolso", "política devolução",
-        "taxa de devolução", "taxa de frete", "coleta barril",
-        "retorno de barril", "chopp devolução", "como devolver",
-        "prazo devolução", "valor devolução", "frete devolução",
-        "antecedência devolução"
-    ]
-},
+        "id": 49,
+        "pergunta": "Quais são as regras para devolução de barril lacrado?",
+        "resposta": (
+            "Regras para Devolução de Barril Lacrado:\n\n"
+            "Será emitida uma carta de crédito, com validade de até 90 dias após a coleta, com valor baseado no preço atual do chopp.\n\n"
+            "Para solicitações feitas com 7 dias de antecedência do evento, será cobrada uma taxa adicional de frete, caso haja entrega."
+        ),
+        "palavras_chave": [
+            "devolução", "devolver barril", "regras devolução",
+            "carta de crédito", "validade carta de crédito", "barril lacrado",
+            "troca de barril", "cancelamento", "reembolso", "política devolução",
+            "taxa de devolução", "taxa de frete", "coleta barril",
+            "retorno de barril", "chopp devolução", "como devolver",
+            "prazo devolução", "valor devolução", "frete devolução",
+            "antecedência devolução"
+        ]
+    },
     {
-    "id": 50,
-    "pergunta": "Quais são as recomendações para instalação da chopeira?",
-    "resposta": (
-        "Recomendações da Brahma Express para facilidade em momento de instalação:\n\n"
-        "° Tenha extensão exclusiva para chopeira preparada para o dia de instalação\n"
-        "° Local definido com mesa que possa suportar nossa chopeira (NÃO PODE SER MESA DE VIDRO)\n"
-        "° No local onde irá ficar nosso produto, tem escadas? Elevador? Por favor nos informe\n"
-        "° Recomendamos um acesso fácil e sem obstruções no dia da instalação, para que ocorra com fluidez, rapidez e otimização"
-    ),
-    "palavras_chave": [
-        "instalação chopeira", "recomendações instalação",
-        "preparar instalação", "como instalar chopeira",
-        "espaço para chopeira", "mesa para chopeira",
-        "extensão elétrica", "tomada chopeira",
-        "escadas instalação", "elevador instalação",
-        "local instalação", "dicas instalação chopeira",
-        "orientações instalação", "acesso instalação",
-        "chopeira elétrica", "instalação brahma express",
-        "facilidade instalação", "pré-requisitos instalação",
-        "mesa vidro chopeira"
-    ]
-},
+        "id": 50,
+        "pergunta": "Quais são as recomendações para instalação da chopeira?",
+        "resposta": (
+            "Recomendações da Brahma Express para facilidade em momento de instalação:\n\n"
+            "° Tenha extensão exclusiva para chopeira preparada para o dia de instalação\n"
+            "° Local definido com mesa que possa suportar nossa chopeira (NÃO PODE SER MESA DE VIDRO)\n"
+            "° No local onde irá ficar nosso produto, tem escadas? Elevador? Por favor nos informe\n"
+            "° Recomendamos um acesso fácil e sem obstruções no dia da instalação, para que ocorra com fluidez, rapidez e otimização"
+        ),
+        "palavras_chave": [
+            "instalação chopeira", "recomendações instalação",
+            "preparar instalação", "como instalar chopeira",
+            "espaço para chopeira", "mesa para chopeira",
+            "extensão elétrica", "tomada chopeira",
+            "escadas instalação", "elevador instalação",
+            "local instalação", "dicas instalação chopeira",
+            "orientações instalação", "acesso instalação",
+            "chopeira elétrica", "instalação brahma express",
+            "facilidade instalação", "pré-requisitos instalação",
+            "mesa vidro chopeira"
+        ]
+    },
     {
-    "id": 51,
-    "pergunta": "Como funciona a carta de crédito em caso de devolução de barril lacrado?",
-    "resposta": (
-        "Caso a compra de um barril volte com barril LACRADO, quando voltar a chopeira e o barril da retirada, enviaremos a carta de crédito referente ao valor da litragem, que poderá ser utilizada novamente em até 90 dias."
-    ),
-    "palavras_chave": [
-        "carta de crédito", "barril lacrado", "devolução barril",
-        "devolver barril lacrado", "crédito devolução",
-        "validade carta de crédito", "prazo carta de crédito",
-        "como funciona carta de crédito", "litragem devolução",
-        "retorno barril", "retirada barril", "cancelamento barril",
-        "reembolso barril", "troca barril lacrado", "compra barril",
-        "devolução chopeira", "retorno chopeira", "frete devolução",
-        "política devolução barril", "condições carta de crédito"
-    ]
-},
+        "id": 51,
+        "pergunta": "Como funciona a carta de crédito em caso de devolução de barril lacrado?",
+        "resposta": (
+            "Caso a compra de um barril volte com barril LACRADO, quando voltar a chopeira e o barril da retirada, enviaremos a carta de crédito referente ao valor da litragem, que poderá ser utilizada novamente em até 90 dias."
+        ),
+        "palavras_chave": [
+            "carta de crédito", "barril lacrado", "devolução barril",
+            "devolver barril lacrado", "crédito devolução",
+            "validade carta de crédito", "prazo carta de crédito",
+            "como funciona carta de crédito", "litragem devolução",
+            "retorno barril", "retirada barril", "cancelamento barril",
+            "reembolso barril", "troca barril lacrado", "compra barril",
+            "devolução chopeira", "retorno chopeira", "frete devolução",
+            "política devolução barril", "condições carta de crédito"
+        ]
+    },
     {
-    "id": 52,
-    "pergunta": "Como funciona o suporte SOS? Horários, atendimento e contatos?",
-    "resposta": (
-        "Nosso suporte SOS funciona nos seguintes dias e horários:\n"
-        "- Quinta-feira: até 20h\n"
-        "- Sexta-feira: até 22h\n"
-        "- Sábado: até 22h\n"
-        "- Domingo: até 18h\n\n"
-        "Pedidos com encomenda de ENTREGA são atendidos pelo SOS presencialmente.\n"
-        "Pedidos de RETIRADA são atendidos por chamada de vídeo, *exceto em casos que realmente seja necessária a nossa ida,* como quando a chopeira não funciona ou o gás acaba.\n\n"
-        "Nosso suporte atende apenas dentro do DF — não atendemos entorno.\n\n"
-        "📞 Telefone SOS Loja: (61) 99451-4488\n"
-        "📞 Suporte Ambev: 0800 888 1021 (domingo a domingo, das 9h às 23h)\n\n"
-        "🔗 Links úteis:\n"
-        "- [Link Site](https://qr.me-qr.com/l/sites)\n"
-        "- [Zap SOS](https://qr.me-qr.com/l/sos-zap)\n"
-        "- [Vídeo SOS](https://qr.me-qr.com/l/sos-video)"
-    ),
-    "palavras_chave": [
-        "suporte SOS", "SOS", "telefone SOS", "zap SOS", "vídeo SOS",
-        "suporte emergência", "contato SOS", "horário SOS",
-        "funcionamento SOS", "emergência chope", "chopeira não funciona",
-        "gás chope acabou", "suporte presencial", "suporte retirada",
-        "atendimento SOS", "Ambev suporte", "link site",
-        "whatsapp SOS", "chamada vídeo SOS", "SOS Brasília", "SOS DF"
-    ]
-}
-
+        "id": 52,
+        "pergunta": "Como funciona o suporte SOS? Horários, atendimento e contatos?",
+        "resposta": (
+            "Nosso suporte SOS funciona nos seguintes dias e horários:\n"
+            "- Quinta-feira: até 20h\n"
+            "- Sexta-feira: até 22h\n"
+            "- Sábado: até 22h\n"
+            "- Domingo: até 18h\n\n"
+            "Pedidos com encomenda de ENTREGA são atendidos pelo SOS presencialmente.\n"
+            "Pedidos de RETIRADA são atendidos por chamada de vídeo, *exceto em casos que realmente seja necessária a nossa ida,* como quando a chopeira não funciona ou o gás acaba.\n\n"
+            "Nosso suporte atende apenas dentro do DF — não atendemos entorno.\n\n"
+            "📞 Telefone SOS Loja: (61) 99451-4488\n"
+            "📞 Suporte Ambev: 0800 888 1021 (domingo a domingo, das 9h às 23h)\n\n"
+            "🔗 Links úteis:\n"
+            "- [Link Site](https://qr.me-qr.com/l/sites )\n"
+            "- [Zap SOS](https://qr.me-qr.com/l/sos-zap )\n"
+        ),
+        "palavras_chave": [
+            "suporte SOS", "SOS", "telefone SOS", "zap SOS", "vídeo SOS",
+            "suporte emergência", "contato SOS", "horário SOS",
+            "funcionamento SOS", "emergência chope", "chopeira não funciona",
+            "gás chope acabou", "suporte presencial", "suporte retirada",
+            "atendimento SOS", "Ambev suporte", "link site",
+            "whatsapp SOS", "chamada vídeo SOS", "SOS Brasília", "SOS DF"
+        ]
+    } # <--- CHAVE ADICIONADA AQUI
 ]
+
