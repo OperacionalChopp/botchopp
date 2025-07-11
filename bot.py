@@ -1,5 +1,9 @@
 import os
 import asyncio
+from dotenv import load_dotenv  # Adicionado para carregar o arquivo .env
+
+load_dotenv()  # Carrega as variáveis do arquivo .env para o ambiente
+
 from http import HTTPStatus
 from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,7 +12,8 @@ from telegram.ext import (
     ContextTypes,
     MessageHandler,
     filters,
-    CallbackQueryHandler
+    CallbackQueryHandler,
+    CommandHandler  # Certifique-se de que CommandHandler também está aqui
  )
 from base_conhecimento.faq_data import faq_data
 
