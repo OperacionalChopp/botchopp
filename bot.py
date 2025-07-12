@@ -116,7 +116,7 @@ ptb.add_handler(CallbackQueryHandler(button_callback_handler))
 
 flask_app = Flask(__name__)
 
-@flask_app.route("/api/telegram/webhook", methods=["POST"])
+@flask_app.route("/webhook", methods=["POST"])
 def telegram_webhook():
     ptb.update_queue.put(Update.de_json(request.get_json(force=True), ptb.bot))
     return Response(status=HTTPStatus.OK)
@@ -126,7 +126,7 @@ def health_check():
     return "Bot is healthy and running!", HTTPStatus.OK
 
 def main():
-    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
+    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
     ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
