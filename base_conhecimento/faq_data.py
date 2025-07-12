@@ -216,7 +216,7 @@ faq_data = [
         "id": 19,
         "pergunta": "O que fazer se o Chopp estiver com problema de qualidade?",
         "resposta": (
-            "Caso perceba alteração no sabor ou qualidade do Chopp, entre em contato via inbox na página oficial do Facebook: www.facebook.com/ChoppBrahmaExpressBrasil/"
+            "Caso perceba alteração no sabor ou qualidade do Chopp, entre em contato via zap da loja: https://wa.me/556139717502"
         ),
         "palavras_chave": [
             "problema no chopp", "qualidade", "sabor alterado", "suporte", "atendimento", "Facebook", "reclamação",
