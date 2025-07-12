@@ -85,7 +85,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(top_matched_faqs) == 1:
         await update.message.reply_text(top_matched_faqs[0]["resposta"])
     else:
-        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f['id']}")] for f in top_matched_faqs]
+        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f["id"]}")] for f in top_matched_faqs]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você procura?",
@@ -117,7 +117,6 @@ flask_app = Flask(__name__)
 def process_update(update_data):
     try:
         update = Update.de_json(update_data, ptb.bot)
-        # Usar asyncio para executar o processamento assíncrono
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(ptb.process_update(update))
@@ -127,15 +126,21 @@ def process_update(update_data):
 
 # Função para configurar o webhook na inicialização
 def setup_webhook():
-    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES))
-        loop.close()
-        print(f"Webhook configurado para: {webhook_url}")
-    except Exception as e:
-        print(f"Erro ao configurar webhook: {e}")
+    render_hostname = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+    print(f"DEBUG: RENDER_EXTERNAL_HOSTNAME = {render_hostname}")
+    if render_hostname:
+        webhook_url = f"https://{render_hostname}/api/telegram/webhook"
+        print(f"DEBUG: Tentando configurar webhook para: {webhook_url}")
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES))
+            loop.close()
+            print(f"DEBUG: Webhook configurado com sucesso para: {webhook_url}")
+        except Exception as e:
+            print(f"DEBUG: Erro ao configurar webhook: {e}")
+    else:
+        print("DEBUG: RENDER_EXTERNAL_HOSTNAME não encontrado, pulando configuração do webhook.")
 
 # Configurar webhook na inicialização do Flask
 setup_webhook()
@@ -195,10 +200,10 @@ def force_setup_webhook():
     except Exception as e:
         return f"Erro ao reconfigurar webhook: {e}", HTTPStatus.INTERNAL_SERVER_ERROR
 
+# Esta função main() agora é apenas para execução local direta, não para o Render
 def main():
-    # Esta função agora é chamada apenas quando executado diretamente
     setup_webhook()
+    flask_app.run(host="0.0.0.0", port=PORT)
 
 if __name__ == "__main__":
     main()
-    flask_app.run(host="0.0.0.0", port=PORT)
