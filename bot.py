@@ -1,4 +1,3 @@
-# (7561248614:AAF0ZgvkEbJ6ZUqb24iNJcs71W3HRaUz3mc)
 import os
 from http import HTTPStatus
 from flask import Flask, request, Response
@@ -14,7 +13,6 @@ from telegram.ext import (
 from base_conhecimento.faq_data import faq_data
 
 # --- Configuração ---
-import os
 TOKEN = os.environ.get("BOT_TOKEN")
 PORT = int(os.environ.get("PORT", 8000))
 
@@ -28,7 +26,6 @@ REGIOES_ATENDIDAS = [
 ]
 
 # --- Lógica do Bot (Handlers) ---
-
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto_start = (
         "Olá! Tudo bem? Aqui é da equipe do Chopp Brahma Express de Águas Claras. "
@@ -45,14 +42,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     texto_usuario = update.message.text.lower()
-    texto_normalizado = texto_usuario.replace('á', 'a').replace('â', 'a').replace('ã', 'a').replace('é', 'e').replace('ê', 'e').replace('í', 'i').replace('ó', 'o').replace('ô', 'o').replace('ú', 'u').replace('ç', 'c')
+    texto_normalizado = texto_usuario.translate(str.maketrans({
+        'á': 'a', 'â': 'a', 'ã': 'a',
+        'é': 'e', 'ê': 'e',
+        'í': 'i',
+        'ó': 'o', 'ô': 'o',
+        'ú': 'u',
+        'ç': 'c'
+    }))
 
-    contem_palavra_de_regiao = any(palavra in texto_normalizado for palavra in ["atende", "entrega", "regiao", "bairro", "cidade"])
-    regiao_encontrada = None
-    for regiao in REGIOES_ATENDIDAS:
-        if regiao in texto_normalizado:
-            regiao_encontrada = regiao
-            break
+    contem_palavra_de_regiao = any(p in texto_normalizado for p in ["atende", "entrega", "regiao", "bairro", "cidade"])
+    regiao_encontrada = next((r for r in REGIOES_ATENDIDAS if r in texto_normalizado), None)
 
     if contem_palavra_de_regiao and regiao_encontrada:
         await update.message.reply_text(
@@ -62,10 +62,9 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     scored_faqs = []
-    palavras_do_usuario = set(texto_usuario.split()) 
+    palavras_do_usuario = set(texto_usuario.split())
     for item in faq_data:
-        palavras_chave_item = set(item["palavras_chave"])
-        intersecao = palavras_do_usuario.intersection(palavras_chave_item)
+        intersecao = palavras_do_usuario.intersection(set(item["palavras_chave"]))
         score = len(intersecao)
         if score > 0:
             scored_faqs.append({"faq": item, "score": score})
@@ -85,9 +84,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(top_matched_faqs) == 1:
         await update.message.reply_text(top_matched_faqs[0]["resposta"])
     else:
-        keyboard = []
-        for faq in top_matched_faqs:
-            keyboard.append([InlineKeyboardButton(faq["pergunta"], callback_data=f"faq_id_{faq['id']}")])
+        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f['id']}")] for f in top_matched_faqs]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você procura?",
@@ -99,17 +96,16 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     await query.answer()
     callback_data = query.data
     if callback_data.startswith("faq_id_"):
-        faq_id_selecionado = int(callback_data[len("faq_id_"):])
-        for item in faq_data:
-            if item["id"] == faq_id_selecionado:
-                await query.message.reply_text(text=item["resposta"])
-                await query.edit_message_reply_markup(reply_markup=None)
-                return
-        await query.message.reply_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
+        faq_id = int(callback_data[len("faq_id_"):])
+        faq = next((item for item in faq_data if item["id"] == faq_id), None)
+        if faq:
+            await query.message.reply_text(text=faq["resposta"])
+            await query.edit_message_reply_markup(reply_markup=None)
+        else:
+            await query.message.reply_text(text="Desculpe, não consegui encontrar a resposta para essa opção.")
 
 # --- Configuração da Aplicação e Servidor ---
 ptb = Application.builder().token(TOKEN).build()
-
 ptb.add_handler(CommandHandler("start", start_command))
 ptb.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), responder))
 ptb.add_handler(CallbackQueryHandler(button_callback_handler))
@@ -118,7 +114,8 @@ flask_app = Flask(__name__)
 
 @flask_app.route("/webhook", methods=["POST"])
 def telegram_webhook():
-    ptb.update_queue.put(Update.de_json(request.get_json(force=True), ptb.bot))
+    data = request.get_json(force=True)
+    ptb.update_queue.put(Update.de_json(data, ptb.bot))
     return Response(status=HTTPStatus.OK)
 
 @flask_app.route("/health", methods=["GET"])
@@ -131,4 +128,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    flask_app.run(host="0.0.0.0", port=PORT)
