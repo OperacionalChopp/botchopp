@@ -14,8 +14,8 @@ from telegram.ext import (
 from base_conhecimento.faq_data import faq_data
 
 # --- Configuração ---
-TOKEN = os.environ.get("7561248614:AAErBhdJ2untqbtF2YEaTIgOJexuKyhzgKg")
-PORT = int(os.environ.get("PORT", 8000))
+TOKEN = os.environ("7561248614:AAErBhdJ2untqbtF2YEaTIgOJexuKyhzgKg")
+PORT = int(os.environ("PORT", 8000))
 
 # --- Lista de Regiões Atendidas ---
 REGIOES_ATENDIDAS = [
