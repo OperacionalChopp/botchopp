@@ -661,7 +661,6 @@ faq_data = [
             "whatsapp SOS", "chamada vídeo SOS", "SOS Brasília", "SOS DF"
         ]
     },
-        ,
     {
         "id": 53,
         "pergunta": "Como funciona a coleta/recolha do equipamento (chopeira, barril)?",
