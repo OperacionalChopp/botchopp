@@ -1,5 +1,4 @@
 import os
-fimport os
 from http import HTTPStatus
 from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -85,7 +84,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(top_matched_faqs) == 1:
         await update.message.reply_text(top_matched_faqs[0]["resposta"])
     else:
-        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f['id']}")] for f in top_matched_faqs]
+        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f["id"]}")] for f in top_matched_faqs]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você procura?",
@@ -160,7 +159,7 @@ def webhook_info():
 
 def main():
     # Configurando o webhook para a nova rota
-    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
+    webhook_url = f"https://{os.environ.get("RENDER_EXTERNAL_HOSTNAME")}/api/telegram/webhook"
     try:
         ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
         print(f"Webhook configurado para: {webhook_url}")
@@ -170,5 +169,4 @@ def main():
 if __name__ == "__main__":
     main()
     flask_app.run(host="0.0.0.0", port=PORT)
-
 
