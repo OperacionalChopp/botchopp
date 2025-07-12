@@ -15,7 +15,7 @@ from base_conhecimento.faq_data import faq_data
 
 # --- Configuração ---
 import os
-TOKEN = os.environ.get(7561248614:AAErBhdJ2untqbtF2YEaTIgOJexuKyhzgKg)
+TOKEN = os.environ.get(7561248614:AAEwXol5HLJpFO2Wajr3lW7qmdICDA54IQQ)
 PORT = int(os.environ.get("PORT", 8000))
 
 # --- Lista de Regiões Atendidas ---
