@@ -1,4 +1,5 @@
 import os
+import asyncio
 from http import HTTPStatus
 from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -84,7 +85,7 @@ async def responder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(top_matched_faqs) == 1:
         await update.message.reply_text(top_matched_faqs[0]["resposta"])
     else:
-        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f["id"]}")] for f in top_matched_faqs]
+        keyboard = [[InlineKeyboardButton(f["pergunta"], callback_data=f"faq_id_{f['id']}")] for f in top_matched_faqs]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você procura?",
@@ -112,14 +113,25 @@ ptb.add_handler(CallbackQueryHandler(button_callback_handler))
 
 flask_app = Flask(__name__)
 
+# Função para processar updates de forma assíncrona
+def process_update(update_data):
+    try:
+        update = Update.de_json(update_data, ptb.bot)
+        # Usar asyncio para executar o processamento assíncrono
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(ptb.process_update(update))
+        loop.close()
+    except Exception as e:
+        print(f"Erro ao processar update: {e}")
+
 # Rota corrigida para corresponder à URL esperada pelo Telegram
 @flask_app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     try:
         data = request.get_json(force=True)
         if data:
-            update = Update.de_json(data, ptb.bot)
-            ptb.update_queue.put(update)
+            process_update(data)
         return Response(status=HTTPStatus.OK)
     except Exception as e:
         print(f"Erro no webhook: {e}")
@@ -131,8 +143,7 @@ def telegram_webhook_legacy():
     try:
         data = request.get_json(force=True)
         if data:
-            update = Update.de_json(data, ptb.bot)
-            ptb.update_queue.put(update)
+            process_update(data)
         return Response(status=HTTPStatus.OK)
     except Exception as e:
         print(f"Erro no webhook: {e}")
@@ -146,7 +157,10 @@ def health_check():
 @flask_app.route("/webhook-info", methods=["GET"])
 def webhook_info():
     try:
-        webhook_info = ptb.bot.get_webhook_info()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        webhook_info = loop.run_until_complete(ptb.bot.get_webhook_info())
+        loop.close()
         return {
             "url": webhook_info.url,
             "has_custom_certificate": webhook_info.has_custom_certificate,
@@ -159,9 +173,12 @@ def webhook_info():
 
 def main():
     # Configurando o webhook para a nova rota
-    webhook_url = f"https://{os.environ.get("RENDER_EXTERNAL_HOSTNAME")}/api/telegram/webhook"
+    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
     try:
-        ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES))
+        loop.close()
         print(f"Webhook configurado para: {webhook_url}")
     except Exception as e:
         print(f"Erro ao configurar webhook: {e}")
@@ -169,4 +186,3 @@ def main():
 if __name__ == "__main__":
     main()
     flask_app.run(host="0.0.0.0", port=PORT)
-
