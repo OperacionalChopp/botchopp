@@ -125,6 +125,21 @@ def process_update(update_data):
     except Exception as e:
         print(f"Erro ao processar update: {e}")
 
+# Função para configurar o webhook na inicialização
+def setup_webhook():
+    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES))
+        loop.close()
+        print(f"Webhook configurado para: {webhook_url}")
+    except Exception as e:
+        print(f"Erro ao configurar webhook: {e}")
+
+# Configurar webhook na inicialização do Flask
+setup_webhook()
+
 # Rota corrigida para corresponder à URL esperada pelo Telegram
 @flask_app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
@@ -171,17 +186,18 @@ def webhook_info():
     except Exception as e:
         return {"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR
 
-def main():
-    # Configurando o webhook para a nova rota
-    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
+# Rota para forçar reconfiguração do webhook
+@flask_app.route("/setup-webhook", methods=["GET"])
+def force_setup_webhook():
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES))
-        loop.close()
-        print(f"Webhook configurado para: {webhook_url}")
+        setup_webhook()
+        return "Webhook reconfigurado com sucesso!", HTTPStatus.OK
     except Exception as e:
-        print(f"Erro ao configurar webhook: {e}")
+        return f"Erro ao reconfigurar webhook: {e}", HTTPStatus.INTERNAL_SERVER_ERROR
+
+def main():
+    # Esta função agora é chamada apenas quando executado diretamente
+    setup_webhook()
 
 if __name__ == "__main__":
     main()
