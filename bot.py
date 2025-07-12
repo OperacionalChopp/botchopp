@@ -1,4 +1,5 @@
 import os
+fimport os
 from http import HTTPStatus
 from flask import Flask, request, Response
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -112,20 +113,62 @@ ptb.add_handler(CallbackQueryHandler(button_callback_handler))
 
 flask_app = Flask(__name__)
 
-@flask_app.route("/webhook", methods=["POST"])
+# Rota corrigida para corresponder à URL esperada pelo Telegram
+@flask_app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
-    data = request.get_json(force=True)
-    ptb.update_queue.put(Update.de_json(data, ptb.bot))
-    return Response(status=HTTPStatus.OK)
+    try:
+        data = request.get_json(force=True)
+        if data:
+            update = Update.de_json(data, ptb.bot)
+            ptb.update_queue.put(update)
+        return Response(status=HTTPStatus.OK)
+    except Exception as e:
+        print(f"Erro no webhook: {e}")
+        return Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+# Mantendo a rota original para compatibilidade
+@flask_app.route("/webhook", methods=["POST"])
+def telegram_webhook_legacy():
+    try:
+        data = request.get_json(force=True)
+        if data:
+            update = Update.de_json(data, ptb.bot)
+            ptb.update_queue.put(update)
+        return Response(status=HTTPStatus.OK)
+    except Exception as e:
+        print(f"Erro no webhook: {e}")
+        return Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
 @flask_app.route("/health", methods=["GET"])
 def health_check():
     return "Bot is healthy and running!", HTTPStatus.OK
 
+# Rota para verificar status do webhook
+@flask_app.route("/webhook-info", methods=["GET"])
+def webhook_info():
+    try:
+        webhook_info = ptb.bot.get_webhook_info()
+        return {
+            "url": webhook_info.url,
+            "has_custom_certificate": webhook_info.has_custom_certificate,
+            "pending_update_count": webhook_info.pending_update_count,
+            "max_connections": webhook_info.max_connections,
+            "ip_address": webhook_info.ip_address
+        }
+    except Exception as e:
+        return {"error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR
+
 def main():
-    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/webhook"
-    ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
+    # Configurando o webhook para a nova rota
+    webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
+    try:
+        ptb.bot.set_webhook(url=webhook_url, allowed_updates=Update.ALL_TYPES)
+        print(f"Webhook configurado para: {webhook_url}")
+    except Exception as e:
+        print(f"Erro ao configurar webhook: {e}")
 
 if __name__ == "__main__":
     main()
     flask_app.run(host="0.0.0.0", port=PORT)
+
+
