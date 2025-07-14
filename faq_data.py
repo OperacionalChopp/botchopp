@@ -17,11 +17,11 @@ faq_data = [
         "id": 2,
         "pergunta": "Como saber quantos litros de chope preciso para o meu evento?",
         "resposta": (
-            "A recomendação inicial é 2 litros por pessoa em eventos de até 4 horas. Para um cálculo mais preciso, utilize a Calculadora da Chopp Brahma Express: https://www.choppbrahmaexpress.com.br/calculadora"
-            "1️⃣ Informe o número de convidados "
-            "2️⃣ Escolha a duração (2h, 4h, 6h ou mais) "
-            "3️⃣ Indique o estilo de consumo: moderado, normal ou intenso "
-            "🌡️ A ferramenta também ajusta o cálculo conforme a temperatura ambiente. "
+            "A recomendação inicial é 2 litros por pessoa em eventos de até 4 horas. Para um cálculo mais preciso, utilize a Calculadora da Chopp Brahma Express: https://www.choppbrahmaexpress.com.br/calculadora\n"
+            "1️⃣ Informe o número de convidados \n"
+            "2️⃣ Escolha a duração (2h, 4h, 6h ou mais) \n"
+            "3️⃣ Indique o estilo de consumo: moderado, normal ou intenso \n"
+            "🌡️ A ferramenta também ajusta o cálculo conforme a temperatura ambiente. \n"
             "🍻 Assim, você descobre exatamente quantos litros serão necessários para ninguém ficar sem chope."
         ),
         "palavras_chave": [
@@ -104,7 +104,7 @@ faq_data = [
         "pergunta": "Como acessar a área de cadastro?",
         "resposta": (
             "Com a reformulação do site, é necessário criar um novo login e senha. Acesse: https://choppbrahmaexpress.com.br/customer/account/login/"
-         ),
+        ),
         "palavras_chave": [
             "cadastro", "login", "senha", "reformulação", "conta de cliente", "atualização de dados",
             "cadastrar", "acessar", "minha conta", "entrar"
@@ -483,7 +483,7 @@ faq_data = [
         "pergunta": "Posso usar meu saldo do Choppback em uma loja física?",
         "resposta": (
             "🛑 Não. O Choppback é exclusivo para compras online realizadas no site oficial: https://www.choppbrahmaexpress.com.br"
-         ),
+        ),
         "palavras_chave": [
             "uso online", "restrição física", "site oficial", "loja digital", "exclusividade", "choppback",
             "loja física", "usar na loja"
@@ -517,7 +517,7 @@ faq_data = [
             "regiões", "atendem", "onde entregam", "lista de regiões"
         ]
     },
-     {
+    {
         "id": 46,
         "pergunta": "Qual o preço e os descontos para o Chopp Brahma?",
         "resposta": (
@@ -532,11 +532,11 @@ faq_data = [
             "⚠️ Lembre-se: os valores podem variar, então sempre consulte o site para confirmar — a promoção é válida enquanto durar a oferta por lá! 😉"
         ),
         "palavras_chave": [
-            "preço", "preços", "valor", "valores", "custo", "desconto", "descontos", 
+            "preço", "preços", "valor", "valores", "custo", "desconto", "descontos",
             "promoção", "oferta", "quanto custa", "tabela", "litro", "litros",
             "30l", "50l", "100l", "150l", "200l", "250l", "300l"
         ]
-    },  # <--- VÍRGULA ADICIONADA AQUI
+    },
     {
         "id": 47,
         "pergunta": "Como funciona a logística de entrega e quais os horários?",
@@ -661,42 +661,41 @@ faq_data = [
             "whatsapp SOS", "chamada vídeo SOS", "SOS Brasília", "SOS DF"
         ]
     },
-   {
-    "id": 53,
-    "pergunta": "Como funciona a coleta/recolha do equipamento (chopeira, barril)?",
-    "resposta": (
-        "⚠️ AVISO INFORMATIVO — RECOLHA DO MATERIAL COMODATADO\n\n"
-        "Este informativo orienta a coleta dos materiais (chopeira, barril, etc.) de acordo com a rota estabelecida durante o horário comercial.\n\n"
-        "**CRITÉRIO:**\n"
-        "As coletas seguem uma rota definida pela empresa para atender o maior número de clientes por região, podendo ser alterada semanalmente conforme a demanda.\n\n"
-        "**HORÁRIO DE COLETA | ROTA:**\n"
-        "Não realizamos coleta agendada. As coletas ocorrem por período:\n"
-        "🕘 Manhã / Tarde\n"
-        "📆 Segunda à Terça-feira — das 9h às 18h\n\n"
-        "**REGIME DE EXCEÇÃO (ALTA DEMANDA):**\n"
-        "Conforme critério da empresa, a coleta pode se estender para:\n"
-        "📆 Quarta-feira — das 9h às 18h\n\n"
-        "🚫 Não fazemos desvios de rota para atendimento personalizado.\n\n"
-        "**COMUNICAÇÃO COM O CLIENTE:**\n"
-        "- A empresa fará contato durante a rota para garantir a presença de um responsável.\n"
-        "- Em caso de insucesso no contato, a rota será reavaliada e reprogramada até quarta-feira.\n"
-        "- Se houver imprevistos, o cliente deve entrar em contato com a loja para entender a rota.\n"
-        "- Caso a rota não atenda à necessidade, o cliente deve providenciar um substituto para liberar o material.\n\n"
-        "**MULTA:**\n"
-        "A partir de quinta-feira será cobrada taxa diária de R$100,00/dia pela não disponibilidade de recolha.\n\n"
-        "**IMPORTANTE!**\n"
-        "- Todos os materiais devem estar prontos e em perfeita condição para recolha.\n"
-        "- É necessário que haja um responsável no local para liberar o acesso.\n"
-        "- A guarda dos materiais é responsabilidade do cliente, sujeito a cobrança em caso de perda ou dano.\n"
-        "- Serão feitas fotos e filmagem dos materiais para respaldo.\n\n"
-        "📦 Agradecemos a colaboração! Equipe de Logística — Chopp Brahma"
-    ),
-    "palavras_chave": [
-        "coleta", "recolha", "recolhimento", "buscar", "retirada", "devolução",
-        "horário coleta", "quando buscam", "rota coleta", "agendar coleta",
-        "multa", "taxa", "material", "equipamento", "chopeira", "barril",
-        "comodatado", "logística reversa", "responsabilidade", "aviso"
-    ]
-}
-
+    {
+        "id": 53,
+        "pergunta": "Como funciona a coleta/recolha do equipamento (chopeira, barril)?",
+        "resposta": (
+            "⚠️ AVISO INFORMATIVO — RECOLHA DO MATERIAL COMODATADO\n\n"
+            "Este informativo orienta a coleta dos materiais (chopeira, barril, etc.) de acordo com a rota estabelecida durante o horário comercial.\n\n"
+            "**CRITÉRIO:**\n"
+            "As coletas seguem uma rota definida pela empresa para atender o maior número de clientes por região, podendo ser alterada semanalmente conforme a demanda.\n\n"
+            "**HORÁRIO DE COLETA | ROTA:**\n"
+            "Não realizamos coleta agendada. As coletas ocorrem por período:\n"
+            "🕘 Manhã / Tarde\n"
+            "📆 Segunda à Terça-feira — das 9h às 18h\n\n"
+            "**REGIME DE EXCEÇÃO (ALTA DEMANDA):**\n"
+            "Conforme critério da empresa, a coleta pode se estender para:\n"
+            "📆 Quarta-feira — das 9h às 18h\n\n"
+            "🚫 Não fazemos desvios de rota para atendimento personalizado.\n\n"
+            "**COMUNICAÇÃO COM O CLIENTE:**\n"
+            "- A empresa fará contato durante a rota para garantir a presença de um responsável.\n"
+            "- Em caso de insucesso no contato, a rota será reavaliada e reprogramada até quarta-feira.\n"
+            "- Se houver imprevistos, o cliente deve entrar em contato com a loja para entender a rota.\n"
+            "- Caso a rota não atenda à necessidade, o cliente deve providenciar um substituto para liberar o material.\n\n"
+            "**MULTA:**\n"
+            "A partir de quinta-feira será cobrada taxa diária de R$100,00/dia pela não disponibilidade de recolha.\n\n"
+            "**IMPORTANTE!**\n"
+            "- Todos os materiais devem estar prontos e em perfeita condição para recolha.\n"
+            "- É necessário que haja um responsável no local para liberar o acesso.\n"
+            "- A guarda dos materiais é responsabilidade do cliente, sujeito a cobrança em caso de perda ou dano.\n"
+            "- Serão feitas fotos e filmagem dos materiais para respaldo.\n\n"
+            "📦 Agradecemos a colaboração! Equipe de Logística — Chopp Brahma"
+        ),
+        "palavras_chave": [
+            "coleta", "recolha", "recolhimento", "buscar", "retirada", "devolução",
+            "horário coleta", "quando buscam", "rota coleta", "agendar coleta",
+            "multa", "taxa", "material", "equipamento", "chopeira", "barril",
+            "comodatado", "logística reversa", "responsabilidade", "aviso"
+        ]
+    }
 ]
