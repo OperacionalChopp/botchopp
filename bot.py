@@ -11,7 +11,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler
 )
-from base_conhecimento.faq_data import faq_data
+# CORREÇÃO: Removido 'base_conhecimento.'
+from faq_data import faq_data
 
 # --- Configuração ---
 TOKEN = os.environ.get("BOT_TOKEN")
