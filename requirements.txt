@@ -1,5 +1,5 @@
 python-telegram-bot
 google-generativeai
-Flask
+Flask[async]  # <--- Mude esta linha
 gunicorn
 gevent
