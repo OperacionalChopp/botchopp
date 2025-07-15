@@ -1,6 +1,6 @@
-Perfeito! Aqui está o código bot.py completo com as correções que discutimos, incluindo a remoção do .initialized e a estrutura de inicialização.
+Opa! Entendido. O problema era justamente o texto explicativo que eu mesmo adicionei, e que foi incluído no arquivo Python.
 
-Copie e cole este código integralmente no seu arquivo bot.py no GitHub.
+Aqui está o código COMPLETO e APENAS o código, sem nenhuma linha de texto explicativo no início. Copie este bloco abaixo e substitua TODO o conteúdo do seu arquivo bot.py por ele.
 
 Python
 
@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 import google.generativeai as genai
 import logging
-import asyncio # Adicionado para garantir que esteja disponível
+import asyncio
 
 # A importação abaixo assume que faq_data.py está dentro da pasta base_conhecimento/
 # Certifique-se de que faq_data.py está realmente lá e que você removeu a versão da raiz.
@@ -144,10 +144,10 @@ async def send_to_gemini(update: Update, context):
     except Exception as e:
         logger.error(f"Erro ao comunicar com a API Gemini para o usuário {user_id}: {e}", exc_info=True)
         await update.message.reply_text("Desculpe, não consegui processar sua pergunta com a IA no momento.")
-    finally: # <-- Este 'finally' e o que vem depois estavam faltando!
+    finally:
         # Desativa o modo IA após a resposta do Gemini ou erro
         context.user_data['using_ai'] = False
-        logger.info(f"Modo IA desativado para o usuário {user_id}.") # <-- Esta é a linha 140 que estava incompleta
+        logger.info(f"Modo IA desativado para o usuário {user_id}.")
 
 async def unknown(update: Update, context):
     logger.info(f"Comando desconhecido recebido: {update.message.text}")
