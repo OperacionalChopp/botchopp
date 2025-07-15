@@ -10,10 +10,8 @@ from telegram.ext import (
 )
 import google.generativeai as genai
 import logging
-# A linha abaixo precisa ser ajustada dependendo de onde faq_data.py realmente está
-# Se faq_data.py estiver na RAIZ, use: from faq_data import faq_data
-# Se faq_data.py estiver em base_conhecimento/, use: from base_conhecimento.faq_data import faq_data
-# Com base na nossa última conversa, vamos assumir que você o moveu para base_conhecimento/
+# A importação abaixo assume que faq_data.py está dentro da pasta base_conhecimento/
+# Certifique-se de que faq_data.py está realmente lá e que você removeu a versão da raiz.
 from base_conhecimento.faq_data import faq_data 
 
 # --- Configuração de Logging (Mantenha este bloco no topo) ---
@@ -136,3 +134,70 @@ async def send_to_gemini(update: Update, context):
         logger.info(f"Resposta do Gemini para {user_id}: {gemini_response_text}")
         await update.message.reply_text(gemini_response_text)
     except Exception as e:
+        logger.error(f"Erro ao comunicar com a API Gemini para o usuário {user_id}: {e}", exc_info=True)
+        await update.message.reply_text("Desculpe, não consegui processar sua pergunta com a IA no momento.")
+    finally: # <-- Este 'finally' e o que vem depois estavam faltando!
+        # Desativa o modo IA após a resposta do Gemini ou erro
+        context.user_data['using_ai'] = False
+        logger.info(f"Modo IA desativado para o usuário {user_id}.") # <-- Esta é a linha 140 que estava incompleta
+
+async def unknown(update: Update, context):
+    logger.info(f"Comando desconhecido recebido: {update.message.text}")
+    await update.message.reply_text("Desculpe, não entendi esse comando. Tente `/start` para começar.")
+
+# --- Configuração do Flask App ---
+flask_app = Flask(__name__)
+
+# ----------------- INÍCIO DO BLOCO TRY-EXCEPT DE INICIALIZAÇÃO -----------------
+try:
+    if not TELEGRAM_BOT_TOKEN:
+        raise ValueError("TELEGRAM_BOT_TOKEN não está definido nas variáveis de ambiente. O bot não pode ser iniciado.")
+
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    # Adicionando Handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_callback_handler))
+    application.add_handler(MessageHandler(filters.COMMAND, unknown)) # Para comandos não reconhecidos
+
+    # --- Configuração do Webhook ---
+    # Remova ou comente application.run_polling() se estiver aqui.
+
+    @flask_app.route('/api/telegram/webhook', methods=['POST'])
+    async def webhook_handler():
+        logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
+        if request.method == "POST":
+            try:
+                update = Update.de_json(request.get_json(force=True), application.bot)
+                await application.process_update(update)
+                logger.debug(f"Update processado com sucesso para update_id: {update.update_id}")
+                return jsonify({"status": "ok"}), 200
+            except Exception as e:
+                logger.error(f"Erro ao processar atualização do webhook: {e}", exc_info=True)
+                return jsonify({"status": "error", "message": str(e)}), 500
+        else:
+            logger.warning(f"Requisição webhook com método HTTP inesperado: {request.method}")
+            abort(400)
+
+    logger.info("Bot Telegram e rota de webhook Flask configurados.")
+
+except Exception as e:
+    logger.critical(f"ERRO FATAL NA INICIALIZAÇÃO PRINCIPAL DO BOT: {e}", exc_info=True)
+    raise
+
+# --- Rota de Health Check ---
+@flask_app.route('/health', methods=['GET'])
+def health_check():
+    logger.info("Rota /health acessada.")
+    return "OK", 200
+
+# --- Bloco para execução local (não executado no Render com Gunicorn) ---
+if __name__ == '__main__':
+    # Para testar localmente, descomente as linhas abaixo e defina as variáveis de ambiente
+    # os.environ["TELEGRAM_BOT_TOKEN"] = "SEU_TOKEN_AQUI"
+    # os.environ["GEMINI_API_KEY"] = "SUA_CHAVE_GEMINI_AQUI"
+    # logger.debug("Executando Flask app localmente...")
+    # PORT = int(os.environ.get("PORT", 5000))
+    # flask_app.run(host="0.0.0.0", port=PORT, debug=True)
+    pass
