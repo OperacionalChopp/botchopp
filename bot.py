@@ -12,9 +12,14 @@ import google.generativeai as genai
 import logging
 import asyncio
 
-# A importação abaixo assume que faq_data.py está dentro da pasta base_conhecimento/
-# Certifique-se de que faq_data.py está realmente lá e que você removeu a versão da raiz.
-from base_conhecimento.faq_data import faq_data 
+# --- Monkey Patching para Gevent e Asyncio ---
+# Esta linha DEVE vir antes de qualquer outra importação que possa
+# ser afetada pelo monkey patching (como 'requests', 'httpx', 'asyncio').
+# Colocá-la logo após as importações básicas e antes do logging/outras importações
+# garante que tudo seja "patchado" corretamente para funcionar com gevent.
+from gevent import monkey
+monkey.patch_all()
+# --- Fim do Monkey Patching ---
 
 # --- Configuração de Logging (Mantenha este bloco no topo) ---
 logging.basicConfig(
@@ -24,7 +29,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 # --- Fim da Configuração de Logging ---
 
+# A importação abaixo assume que faq_data.py está dentro da pasta base_conhecimento/
+# Certifique-se de que faq_data.py está realmente lá e que você removeu a versão da raiz.
+from base_conhecimento.faq_data import faq_data
+
 # --- Variáveis de Ambiente ---
+# Renomeie as variáveis no Render para TELEGRAM_BOT_TOKEN e GEMINI_API_KEY
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
@@ -82,6 +92,13 @@ async def handle_message(update: Update, context):
         return
 
     # Lógica de FAQ
+    # Adicionando tratamento para saudações básicas que devem ativar o /start ou uma saudação simples
+    saudacoes = ["olá", "ola", "oi", "bom dia", "boa tarde", "boa noite", "e aí"]
+    if any(saudacao in user_text for saudacao in saudacoes):
+        await start(update, context) # Chama a função start para enviar a mensagem de boas-vindas
+        logger.info(f"Saudação detectada: '{user_text}'. Enviando mensagem de boas-vindas.")
+        return
+
     matched_faqs = []
     for item in faq_data:
         if any(keyword in user_text for keyword in item["palavras_chave"]):
@@ -106,13 +123,15 @@ async def handle_message(update: Update, context):
 
 async def button_callback_handler(update: Update, context):
     query = update.callback_query
-    await query.answer()
+    await query.answer() # Importante para parar o loading no botão
     selected_faq_id = query.data
     user_name = update.effective_user.first_name
     logger.info(f"Botão de FAQ pressionado por {user_name}: ID {selected_faq_id}")
 
     for item in faq_data:
         if str(item["id"]) == selected_faq_id:
+            # Edita a mensagem original com a resposta para remover os botões.
+            # Isso faz com que os botões "desapareçam" após a seleção, que é o comportamento que você descreveu como "normal".
             await query.edit_message_text(text=item["resposta"])
             logger.info(f"Resposta da FAQ por botão: {item['pergunta']}")
             return
@@ -140,8 +159,11 @@ async def send_to_gemini(update: Update, context):
         await update.message.reply_text("Desculpe, não consegui processar sua pergunta com a IA no momento.")
     finally:
         # Desativa o modo IA após a resposta do Gemini ou erro
+        # Se você quer que o usuário continue no modo IA para várias perguntas,
+        # remova ou comente a linha abaixo.
         context.user_data['using_ai'] = False
         logger.info(f"Modo IA desativado para o usuário {user_id}.")
+
 
 async def unknown(update: Update, context):
     logger.info(f"Comando desconhecido recebido: {update.message.text}")
@@ -163,13 +185,22 @@ async def setup_bot():
 
     # Adicionando Handlers
     application.add_handler(CommandHandler("start", start))
+    # Handler para saudações e texto livre que não são comandos
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback_handler))
     application.add_handler(MessageHandler(filters.COMMAND, unknown)) # Para comandos não reconhecidos
 
     # Inicializa a aplicação para processamento de webhook
     await application.initialize()
-    logger.info("Aplicação Telegram inicializada para webhooks.")
+    # Adiciona o webhook explicitamente.
+    # Certifique-se de que a URL do seu Render esteja configurada para /api/telegram/webhook
+    webhook_url = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+    if webhook_url:
+        full_webhook_url = f"https://{webhook_url}/api/telegram/webhook"
+        await application.bot.set_webhook(url=full_webhook_url)
+        logger.info(f"Webhook definido para: {full_webhook_url}")
+    else:
+        logger.warning("RENDER_EXTERNAL_HOSTNAME não definido. Webhook não será configurado automaticamente.")
 
 
 @flask_app.route('/api/telegram/webhook', methods=['POST'])
@@ -177,10 +208,11 @@ async def webhook_handler():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
     if request.method == "POST":
         global application # Garante que estamos usando a variável global
-        if application is None: # Apenas verifica se a aplicação foi criada
+        if application is None: # Verifica se a aplicação foi criada (deve ter sido no setup_bot())
             logger.error("A aplicação do Telegram não está inicializada. Tentando configurar novamente.")
             try:
                 await setup_bot() # Tenta configurar se não estiver inicializada
+                logger.info("Aplicação Telegram re-inicializada no webhook.")
             except Exception as e:
                 logger.critical(f"Falha ao configurar o bot no webhook: {e}", exc_info=True)
                 return jsonify({"status": "error", "message": "Bot initialization failed"}), 500
@@ -204,33 +236,40 @@ def health_check():
     return "OK", 200
 
 # Bloco de inicialização principal para o Gunicorn
-if __name__ == '__main__':
-    # No Render, o Gunicorn executa o `flask_app` diretamente.
-    # Esta parte abaixo geralmente é para execução LOCAL via `python bot.py`.
-    # Para garantir que o bot seja inicializado mesmo sem uma requisição inicial ao webhook,
-    # podemos adicionar uma chamada para setup_bot() aqui, mas no contexto do Gunicorn,
-    # a primeira requisição ao webhook normalmente acionaria a inicialização.
-    # No entanto, para garantir, vamos usar um hack para executar setup_bot() ao iniciar.
-    # IMPORTANTE: Em ambientes de produção (como o Render com Gunicorn), o __name__ == '__main__'
-    # não é o ponto de entrada principal. O Gunicorn importa o `flask_app` diretamente.
-    # A inicialização deve ser parte do processo de importação do módulo, ou ser acionada pela
-    # primeira requisição.
-
-    # Para Render/Gunicorn, a inicialização será feita na primeira requisição ao webhook
-    # ou podemos usar um mecanismo de inicialização antes do binding do Gunicorn.
-    # Uma forma comum é ter uma função `init_app` que o Gunicorn possa chamar se necessário,
-    # mas para simplificar, a verificação dentro de `webhook_handler` é mais robusta.
-
-    # Para garantir que o `setup_bot` seja executado uma vez no início,
-    # podemos adicionar uma chamada a ele. O Render (ou Gunicorn) executa o script uma vez
-    # para carregar o `flask_app`.
-    try:
-        # Tenta executar setup_bot() ao carregar o módulo
-        asyncio.run(setup_bot())
-        logger.info("Bot Telegram configurado na inicialização do módulo.")
-    except Exception as e:
+# Isso será executado quando o módulo for importado pelo Gunicorn
+try:
+    # Cria um novo loop de eventos e executa setup_bot()
+    # Isso garante que setup_bot() seja chamado uma vez quando o Gunicorn carrega o app.
+    # É importante usar um novo loop aqui para evitar conflitos se houver um loop existente.
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # Se um loop já estiver rodando (ex: em ambientes de teste ou IDEs),
+        # agendamos a tarefa. No Gunicorn/Render, isso não deve ser um problema.
+        loop.create_task(setup_bot())
+        logger.info("Agendando setup_bot para o loop de eventos existente.")
+    else:
+        loop.run_until_complete(setup_bot())
+        logger.info("Bot Telegram configurado na inicialização do módulo (novo loop).")
+except RuntimeError as e:
+    # Catch the "Event loop is already running" in specific scenarios,
+    # and just log it, assuming it will be handled by the webhook.
+    if "Event loop is already running" in str(e):
+        logger.warning("RuntimeError: Event loop is already running. "
+                       "Bot setup will likely occur on the first webhook request.")
+    else:
         logger.critical(f"ERRO FATAL NA CONFIGURAÇÃO INICIAL DO BOT: {e}", exc_info=True)
-        # Re-raise para que o Render saiba que a inicialização falhou
-        raise
+        raise # Re-raise para que o Render saiba que a inicialização falhou
+except Exception as e:
+    logger.critical(f"ERRO FATAL NA CONFIGURAÇÃO INICIAL DO BOT: {e}", exc_info=True)
+    raise # Re-raise para que o Render saiba que a inicialização falhou
 
-    pass # Mantenha o pass se você não tem código de execução local aqui.
+# O `if __name__ == '__main__'` não é estritamente necessário para o Render/Gunicorn
+# mas pode ser útil para testes locais.
+if __name__ == '__main__':
+    # Esta parte é mais para execução local (python bot.py)
+    # No Render, o Gunicorn executa o `flask_app` diretamente.
+    # A inicialização do bot já foi feita fora deste bloco `if __name__ == '__main__'`
+    # para garantir que ocorra quando o Gunicorn carrega o módulo.
+    # Para testar localmente, você pode querer adicionar:
+    # flask_app.run(debug=True, port=5000)
+    pass
