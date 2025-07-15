@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Configura o webhook
-# Este comando executa a função set_webhook_on_startup uma vez
+# Configura o webhook do Telegram
 python -c "import asyncio; from bot import set_webhook_on_startup; asyncio.run(set_webhook_on_startup())"
 
 # Inicia o servidor Uvicorn
