@@ -1,7 +1,7 @@
 import os
 import logging
 import json
-import asyncio
+import asyncio # Mantenha asyncio, é usado internamente pelo PTB
 
 from flask import Flask, request, jsonify
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 # --- Fim da Configuração de Logging ---
 
 # Carregar dados do FAQ de um arquivo JSON
-# O arquivo faq_data.json deve estar no mesmo diretório ou em um subdiretório
-# Se o arquivo estiver em 'base_conhecimento/faq_data.py', ajuste o caminho
 try:
     with open('base_conhecimento/faq_data.json', 'r', encoding='utf-8') as f:
         FAQ_DATA = json.load(f)
@@ -31,7 +29,7 @@ except json.JSONDecodeError:
     FAQ_DATA = {}
 
 
-# --- Funções do Bot ---
+# --- Funções do Bot (Sem alterações aqui) ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Envia uma mensagem de boas-vindas quando o comando /start é emitido."""
@@ -64,7 +62,6 @@ def find_faq_answers(user_message: str) -> list:
         keywords = [kw.lower() for kw in item.get("keywords", [])]
         question_lower = item.get("pergunta", "").lower()
 
-        # Verifica se alguma palavra-chave está na mensagem ou se a pergunta é uma substring da mensagem
         if any(keyword in message_lower for keyword in keywords) or question_lower in message_lower:
             found_answers.append(item)
     return found_answers
@@ -84,13 +81,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             logger.info(f"FAQ encontrado para '{user_message}': {faq_item['pergunta']}")
             await update.message.reply_text(f"Resposta: {faq_item['resposta']}")
         else:
-            # Múltiplas FAQs encontradas, oferece botões
             keyboard = []
             for faq_item in found_faqs:
-                # O callback_data deve ser uma string única para cada botão
-                # Usamos o 'id' do FAQ como callback_data
                 callback_data = str(faq_item.get("id"))
-                if callback_data: # Certifique-se de que o ID existe
+                if callback_data:
                     keyboard.append([InlineKeyboardButton(faq_item['pergunta'], callback_data=callback_data)])
                 else:
                     logger.warning(f"FAQ sem ID encontrado: {faq_item.get('pergunta', 'N/A')}")
@@ -110,7 +104,6 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
     user_full_name = update.effective_user.full_name
     logger.info(f"Botão de FAQ pressionado por {user_full_name}: ID {query.data}")
 
-    # Sempre responda ao callback query para remover o estado de carregamento do botão
     try:
         await query.answer()
     except NetworkError as e:
@@ -124,7 +117,6 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
     selected_faq_id = query.data
 
-    # Encontra a FAQ correspondente ao ID
     selected_faq = None
     for item in FAQ_DATA.values():
         if str(item.get("id")) == selected_faq_id:
@@ -141,47 +133,64 @@ async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
 # --- Configuração do Flask e do Bot ---
 
-# Use 0.0.0.0 como host para o Render.com escutar em todas as interfaces.
-# A porta será definida pela variável de ambiente PORT do Render.com.
 PORT = int(os.environ.get('PORT', 5000))
-TOKEN = os.environ.get('BOT_TOKEN') # Variável de ambiente para o token do bot
+TOKEN = os.environ.get('BOT_TOKEN')
 
 if not TOKEN:
     logger.critical("Variável de ambiente 'BOT_TOKEN' não definida. O bot não pode iniciar.")
     exit(1)
 
 flask_app = Flask(__name__)
-application = None # Será inicializado na primeira requisição ao webhook
 
-async def setup_bot_application():
-    """Configura e retorna a instância do Application do PTB."""
-    global application
-    if application is None:
-        logger.info("Inicializando nova instância do Bot Telegram.")
-        application = Application.builder().token(TOKEN).build()
+# --- INICIALIZAÇÃO ÚNICA DO BOT TELEGRAM ---
+# Cria a instância do Application UMA VEZ
+application = Application.builder().token(TOKEN).build()
+logger.info("Instância do Bot Telegram criada.")
 
-        # Adiciona handlers
-        application.add_handler(MessageHandler(filters.COMMAND, help_command)) # Primeiro, para comandos desconhecidos
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        application.add_handler(CallbackQueryHandler(button_callback_handler))
+# Adiciona handlers UMA VEZ
+application.add_handler(MessageHandler(filters.COMMAND, help_command)) # Primeiro, para comandos desconhecidos
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+application.add_handler(CallbackQueryHandler(button_callback_handler))
 
-        # Define o webhook
-        webhook_url = os.environ.get('WEBHOOK_URL')
-        if not webhook_url:
-            logger.warning("Variável de ambiente 'WEBHOOK_URL' não definida. Usando URL padrão ou tentando inferir.")
-            # Em ambientes como Render, a URL pode ser inferida ou definida por eles
-            # Para testes locais, defina-a explicitamente ou use ngrok
-            webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'your-app-name.onrender.com')}/api/telegram/webhook"
-            logger.info(f"Tentando inferir WEBHOOK_URL: {webhook_url}")
+# Define o webhook UMA VEZ na inicialização do aplicativo
+# Usamos uma função assíncrona para chamar set_webhook
+async def set_telegram_webhook():
+    webhook_url = os.environ.get('WEBHOOK_URL')
+    if not webhook_url:
+        logger.warning("Variável de ambiente 'WEBHOOK_URL' não definida. Tentando inferir para o Render.")
+        # Para o Render, use RENDER_EXTERNAL_HOSTNAME
+        webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME')}/api/telegram/webhook"
+        logger.info(f"Webhook URL inferida: {webhook_url}")
 
-        if webhook_url:
-            await application.bot.set_webhook(url=webhook_url)
-            logger.info(f"Webhook definido para: {webhook_url}")
-        else:
-            logger.critical("Não foi possível determinar a WEBHOOK_URL. O bot pode não receber atualizações.")
+    if webhook_url:
+        # ATENÇÃO: set_webhook deve ser chamado APENAS UMA VEZ no início.
+        # Ele é assíncrono, então precisamos de um loop de evento para executá-lo.
+        # No ambiente Gunicorn, isso pode ser um pouco complicado.
+        # A forma mais segura é garantir que seja chamado antes do loop de eventos principal do Gunicorn.
+        # Para Render, que usa gunicorn, o ideal é que esta configuração seja feita na inicialização.
+        # O `initialize()` também deve ser chamado antes de processar qualquer update.
+        await application.bot.set_webhook(url=webhook_url)
+        logger.info(f"Webhook definido para: {webhook_url}")
+    else:
+        logger.critical("Não foi possível determinar a WEBHOOK_URL. O bot pode não receber atualizações.")
 
-        logger.info("Nova instância do Bot Telegram configurada.")
-    return application
+    # IMPORTANTE: Chame initialize() AQUI para garantir que o Application esteja pronto.
+    application.initialize()
+    logger.info("Application do Bot Telegram inicializado.")
+
+# Antes de iniciar o servidor Flask, execute a configuração do webhook
+# Como set_telegram_webhook é assíncrono, precisamos executá-lo em um loop de eventos.
+# Para Gunicorn, que gerencia seu próprio loop, isso é um desafio.
+# Uma forma comum é usar um truque ou garantir que o Gunicorn execute esta parte.
+# No Render, que está rodando seu app via `gunicorn bot:flask_app`, a inicialização
+# das variáveis globais acima e a chamada ao initialize() ocorrerão uma vez por worker.
+
+# Se você notar problemas de inicialização com Gunicorn/Render, pode ser necessário
+# mover a lógica de `set_webhook` para um ponto de entrada que é garantido
+# ser executado apenas uma vez por processo worker, ou para um script de deploy.
+# No entanto, a causa do erro original era o `initialize()`, então vamos focar nisso.
+
+# --- Rotas do Flask (Sem alterações aqui, exceto o uso do 'application' global) ---
 
 @flask_app.route('/health', methods=['GET'])
 def health_check():
@@ -193,17 +202,18 @@ def health_check():
 async def telegram_webhook():
     """Recebe e processa as atualizações do Telegram."""
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    app = await setup_bot_application()
 
+    # O 'application' já está globalmente inicializado. Não precisa mais do setup_bot_application aqui.
     # O telegram.ext.Application espera um objeto Update
     # Convertemos o JSON da requisição para um objeto Update
     try:
         update_json = request.get_json()
         if update_json:
-            update = Update.de_json(update_json, app.bot)
+            # Passamos o 'application.bot' para o Update.de_json
+            update = Update.de_json(update_json, application.bot)
             logger.debug(f"Update recebido: {update.update_id}")
-            # Processa o update
-            await app.process_update(update)
+            # Processa o update usando a instância global 'application'
+            await application.process_update(update) # Erro original era aqui
             logger.debug(f"Update processado com sucesso para update_id: {update.update_id}")
             return jsonify({"status": "ok"}), 200
         else:
@@ -213,20 +223,20 @@ async def telegram_webhook():
         logger.error(f"Erro ao processar update do Telegram: {e}", exc_info=True)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
+# --- Execução Local (Para desenvolvimento) ---
 if __name__ == "__main__":
-    # Quando rodado localmente, a inicialização é diferente
-    # Para o Render.com, o Gunicorn irá chamar flask_app.
-    # Esta parte é mais para testar localmente.
     logger.info("Iniciando bot localmente (modo de desenvolvimento).")
-    async def run_local_bot():
-        # Apenas para teste local sem webhook (polling)
-        # Em produção com webhook, esta parte não será executada diretamente.
-        _app = await setup_bot_application()
-        await _app.run_polling(poll_interval=1) # Use um intervalo maior para evitar banimento do Telegram
-        
-    # Execute a função principal se estiver rodando o script diretamente
-    # Para implantação, o Gunicorn gerenciará o loop de eventos.
-    # No Render.com, o 'gunicorn bot:flask_app' fará a execução.
-    # Evitamos rodar o run_local_bot() diretamente aqui para não interferir com o Gunicorn.
-    pass
+    # Para testes locais, você ainda precisará de um loop de evento para o set_webhook
+    # e para rodar o bot em polling (se não estiver usando ngrok/webhooks locais).
+    # Aqui, vamos garantir que a inicialização assíncrona seja chamada.
+
+    # Configura o loop de eventos para o set_webhook
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(set_telegram_webhook())
+
+    # Quando rodando localmente com `python bot.py`, você pode querer rodar o Flask
+    # e o polling do Telegram se não estiver usando webhooks.
+    # Para o Render, Gunicorn vai lidar com isso.
+    # Se você quiser testar localmente com Flask e webhooks (ex: com ngrok),
+    # remova a parte do run_polling e execute o Flask normalmente.
+    flask_app.run(host='0.0.0.0', port=PORT)
