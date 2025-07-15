@@ -177,8 +177,8 @@ async def initialize_telegram_bot() -> Application:
         else:
             logger.critical("Não foi possível determinar a WEBHOOK_URL. O bot pode não receber atualizações.")
 
-        # FINALMENTE, chame initialize() depois de toda a configuração
-        application.initialize()
+        # ATENÇÃO: Adicionado 'await' aqui!
+        await application.initialize() # <--- AQUI ESTÁ A MUDANÇA CRÍTICA
         logger.info("Application do Bot Telegram inicializado e webhook configurado.")
     return application
 
@@ -196,8 +196,6 @@ async def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
 
     # Garanta que o Application esteja inicializado.
-    # Esta linha pode ser chamada em cada requisição, mas initialize_telegram_bot
-    # tem uma guarda interna (`if application is None:`) para rodar apenas uma vez.
     app = await initialize_telegram_bot()
 
     try:
@@ -219,32 +217,13 @@ async def telegram_webhook():
 if __name__ == "__main__":
     logger.info("Iniciando bot localmente (modo de desenvolvimento).")
 
-    # Para testes locais com Gunicorn e Flask, você precisa garantir que o initialize_telegram_bot
-    # seja chamado. Como 'gunicorn bot:flask_app' não executa diretamente o `if __name__ == "__main__":`,
-    # este bloco é relevante principalmente para `python bot.py`.
-    # A maneira ideal de garantir a inicialização com Gunicorn é através de hooks ou
-    # por um comando de inicialização separado (ex: um script de startup no Render).
-
-    # No Render, o comando `gunicorn bot:flask_app` irá carregar o módulo `bot.py`.
-    # O `application = None` e a função `initialize_telegram_bot` serão definidos.
-    # Quando a primeira requisição chega ao webhook, `await initialize_telegram_bot()`
-    # será chamado, e como `application` será `None` pela primeira vez naquele worker,
-    # ele executará toda a lógica de inicialização, incluindo `initialize()` e `set_webhook()`.
-    # Nas requisições subsequentes para o mesmo worker, `application` não será `None`,
-    # então a lógica de inicialização não será repetida.
-
-    # Para simular o comportamento de um ambiente de produção (com webhook) localmente,
-    # você precisaria de algo como ngrok ou configurar um webhook localmente.
-    # Para teste local simples, você pode querer habilitar o polling:
-    async def run_local_polling_bot():
-        _app = await initialize_telegram_bot()
-        logger.info("Rodando bot em modo polling localmente...")
-        await _app.run_polling(poll_interval=1) # Use um intervalo maior para evitar banimento do Telegram
-
-    # Descomente a linha abaixo para testar em polling localmente (sem webhook)
+    # Para testes locais com polling (sem webhook), descomente a linha abaixo:
+    # async def run_local_polling_bot():
+    #    _app = await initialize_telegram_bot()
+    #    logger.info("Rodando bot em modo polling localmente...")
+    #    await _app.run_polling(poll_interval=1)
     # asyncio.run(run_local_polling_bot())
 
-    # Se você for rodar localmente com Flask e webhooks (ex: com ngrok),
+    # Para rodar localmente com Flask e webhook (ex: com ngrok),
     # basta executar o Flask. A inicialização do bot ocorrerá na primeira requisição.
-    # No Render, o Gunicorn fará isso:
     flask_app.run(host='0.0.0.0', port=PORT)
