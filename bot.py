@@ -174,7 +174,7 @@ async def setup_bot():
 async def webhook_handler():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
     if request.method == "POST":
-        if application is None or not application.initialized: # Adiciona verificação
+       if application is None: # Apenas verifica se a aplicação foi criada
             logger.error("A aplicação do Telegram não está inicializada. Tentando configurar novamente.")
             try:
                 await setup_bot() # Tenta configurar se não estiver inicializada
