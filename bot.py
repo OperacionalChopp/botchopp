@@ -1,9 +1,3 @@
-Opa! Entendido. O problema era justamente o texto explicativo que eu mesmo adicionei, e que foi incluído no arquivo Python.
-
-Aqui está o código COMPLETO e APENAS o código, sem nenhuma linha de texto explicativo no início. Copie este bloco abaixo e substitua TODO o conteúdo do seu arquivo bot.py por ele.
-
-Python
-
 import os
 from flask import Flask, request, abort, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
