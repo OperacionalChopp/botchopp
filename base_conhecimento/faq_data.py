@@ -715,5 +715,39 @@ faq_data = [
         "não resolveu", "ainda tenho dúvidas", "falar com alguém", "atendimento humano",
         "chat", "direcionar", "onde ligo", "qual o numero", "falar com consultor"
     ]
+},
+    {
+    "id": 55,
+    "pergunta": "Quais dados preciso informar para fazer um cadastro ou pedido?",
+    "resposta": (
+        "Para que possamos processar seu pedido e emitir a Ordem de Serviço e Nota Fiscal, precisamos dos seguintes dados. Por favor, preencha-os com atenção:\n\n"
+        "--- --- ---\n\n"
+        "**DADOS DO EVENTO:**\n"
+        "📅 *Data do evento:*\n"
+        "⏰ *Horário do evento:*\n"
+        "🗺️ *Endereço do evento:*\n"
+        "✉️ *CEP do evento:*\n"
+        "🗓️ *Data da entrega (do equipamento/chopp):*\n\n"
+        "**DADOS PESSOAIS / EMPRESARIAIS:**\n"
+        "📧 *E-mail:*\n"
+        "👤 *Nome completo / Razão Social:*\n"
+        "🏢 *Nome Fantasia (para CNPJ, se aplicável):*\n"
+        "📞 *Telefone:*\n"
+        "🆔 *CPF / CNPJ:*\n"
+        "💳 *RG / Órgão Emissor (para CPF, se aplicável):*\n"
+        "📝 *Inscrição Estadual (para CNPJ, se aplicável):*\n"
+        "🏡 *Endereço da sua residência:*\n"
+        "📮 *CEP da residência:*\n\n"
+        "**DETALHES DO PEDIDO:**\n"
+        "🍺 *Quantidade de Litros de Chopp:*\n"
+        "💰 *Forma de Pagamento (Pix ou Cartão):*\n\n"
+        "--- --- ---\n\n"
+        "Agradecemos a sua colaboração! Assim que tivermos essas informações, agilizaremos seu pedido."
+    ),
+    "palavras_chave": [
+        "cadastro", "pedido", "dados", "informar dados", "documentos", "o que preciso",
+        "requisitos", "fazer pedido", "cadastro de cliente", "solicitar pedido",
+        "informações para pedido", "lista de dados", "pedir chopp", "como pedir"
+    ]
 }
 ]
