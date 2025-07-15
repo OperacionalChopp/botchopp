@@ -1,25 +1,12 @@
 import os
-from flask import Flask, request, abort, jsonify
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    filters,
-)
-import google.generativeai as genai
 import logging
+import json
 import asyncio
 
-# --- Monkey Patching para Gevent e Asyncio ---
-# Esta linha DEVE vir antes de qualquer outra importação que possa
-# ser afetada pelo monkey patching (como 'requests', 'httpx', 'asyncio').
-# Colocá-la logo após as importações básicas e antes do logging/outras importações
-# garante que tudo seja "patchado" corretamente para funcionar com gevent.
-from gevent import monkey
-monkey.patch_all()
-# --- Fim do Monkey Patching ---
+from flask import Flask, request, jsonify
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, ContextTypes
+from telegram.error import NetworkError
 
 # --- Configuração de Logging (Mantenha este bloco no topo) ---
 logging.basicConfig(
@@ -29,229 +16,217 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 # --- Fim da Configuração de Logging ---
 
-# A importação abaixo assume que faq_data.py está dentro da pasta base_conhecimento/
-from base_conhecimento.faq_data import faq_data
+# Carregar dados do FAQ de um arquivo JSON
+# O arquivo faq_data.json deve estar no mesmo diretório ou em um subdiretório
+# Se o arquivo estiver em 'base_conhecimento/faq_data.py', ajuste o caminho
+try:
+    with open('base_conhecimento/faq_data.json', 'r', encoding='utf-8') as f:
+        FAQ_DATA = json.load(f)
+    logger.info("FAQ_DATA carregado com sucesso.")
+except FileNotFoundError:
+    logger.error("Arquivo faq_data.json não encontrado. Certifique-se de que está no diretório correto.")
+    FAQ_DATA = {}
+except json.JSONDecodeError:
+    logger.error("Erro ao decodificar faq_data.json. Verifique a sintaxe do JSON.")
+    FAQ_DATA = {}
 
-# --- Variáveis de Ambiente ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
-if not TELEGRAM_BOT_TOKEN:
-    logger.critical("TELEGRAM_BOT_TOKEN não encontrado nas variáveis de ambiente! O bot não pode iniciar.")
-if not GEMINI_API_KEY:
-    logger.critical("GEMINI_API_KEY não encontrado nas variáveis de ambiente! A IA não funcionará.")
-
-# Configura a API Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
-
-# Dicionário para armazenar o histórico de conversa do Gemini
-conversations = {}
 
 # --- Funções do Bot ---
 
-async def start(update: Update, context):
-    user_id = update.effective_user.id
-    user_name = update.effective_user.first_name
-    logger.info(f"Comando /start recebido de {user_name} (ID: {user_id})")
-
-    # Inicia uma nova conversa Gemini para o usuário
-    if user_id not in conversations:
-        conversations[user_id] = model.start_chat(history=[])
-    else:
-        # Reinicia a conversa se o usuário já tinha uma (opcional, pode ser mantido o histórico)
-        conversations[user_id] = model.start_chat(history=[])
-
-
-    welcome_message = (
-        "Fala, mestre! 🍺 Bem-vindo à Loja CHOPP! O garçom digital está aqui pra te ajudar. "
-        "O que manda hoje?!\n\n"
-        "🍺 - Onde fica a loja?\n"
-        "🕒 - Qual nosso horário?\n"
-        "📜 - Quero ver o cardápio!\n"
-        "🧠 - Tirar uma dúvida com a IA!\n\n"
-        "É só pedir que eu trago a informação geladinha!"
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Envia uma mensagem de boas-vindas quando o comando /start é emitido."""
+    logger.info(f"Comando /start recebido de {update.effective_user.full_name} (ID: {update.effective_user.id})")
+    await update.message.reply_text(
+        'Olá! Sou o CHOPP Digital. Em que posso ajudar hoje? '
+        'Você pode me perguntar sobre nossos produtos, horários de funcionamento ou como fazer seu pedido.'
     )
-    await update.message.reply_text(welcome_message)
 
-async def handle_message(update: Update, context):
-    user_text = update.message.text.lower()
-    user_id = update.effective_user.id
-    user_name = update.effective_user.first_name
-    logger.info(f"Mensagem recebida de {user_name} (ID: {user_id}): {user_text}")
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Envia uma mensagem de ajuda quando o comando /help é emitido."""
+    logger.info(f"Comando /help recebido de {update.effective_user.full_name} (ID: {update.effective_user.id})")
+    await update.message.reply_text(
+        'Aqui estão algumas coisas que posso fazer:\n'
+        '- Perguntar sobre produtos\n'
+        '- Saber sobre os horários de funcionamento\n'
+        '- Tirar dúvidas gerais\n'
+        'Seja específico em sua pergunta para eu poder ajudar melhor!'
+    )
 
-    # Verifica se o usuário quer usar a IA
-    if "tirar uma dúvida com a ia" in user_text:
-        await update.message.reply_text(
-            "Certo! Estou ativando minha mente para suas perguntas. Pode mandar sua dúvida para a IA!"
-        )
-        context.user_data['using_ai'] = True
-        
-        # Opcional: Remova o teclado de FAQ se estiver presente e o usuário mudar para o modo IA
-        if update.message.reply_markup and isinstance(update.message.reply_markup, InlineKeyboardMarkup):
-            try:
-                # Tenta editar a mensagem anterior do bot para remover os botões
-                # ou edita a própria mensagem do usuário se for a última do bot
-                # Nota: edit_reply_markup só funciona se a mensagem foi enviada pelo bot.
-                # Como essa é uma nova mensagem do usuário, não há mensagem do bot para editar,
-                # então essa parte é mais para cenários onde o bot enviou os botões por último.
-                pass # Não fazemos nada aqui, a nova mensagem já "esconde" os botões
-            except Exception as e:
-                logger.warning(f"Não foi possível remover o teclado inline ao ativar IA: {e}")
-        return
+def find_faq_answers(user_message: str) -> list:
+    """
+    Procura por respostas no FAQ_DATA com base na mensagem do usuário.
+    Retorna uma lista de dicionários com 'pergunta' e 'resposta'.
+    """
+    found_answers = []
+    message_lower = user_message.lower()
 
-    # Se o usuário está no modo IA
-    if context.user_data.get('using_ai', False):
-        await send_to_gemini(update, context)
-        return
+    for item in FAQ_DATA.values():
+        keywords = [kw.lower() for kw in item.get("keywords", [])]
+        question_lower = item.get("pergunta", "").lower()
 
-    # Lógica de FAQ
-    saudacoes = ["olá", "ola", "oi", "bom dia", "boa tarde", "boa noite", "e aí"]
-    if any(saudacao in user_text for saudacao in saudacoes):
-        await start(update, context)
-        logger.info(f"Saudação detectada: '{user_text}'. Enviando mensagem de boas-vindas.")
-        return
+        # Verifica se alguma palavra-chave está na mensagem ou se a pergunta é uma substring da mensagem
+        if any(keyword in message_lower for keyword in keywords) or question_lower in message_lower:
+            found_answers.append(item)
+    return found_answers
 
-    matched_faqs = []
-    for item in faq_data:
-        if any(keyword in user_text for keyword in item["palavras_chave"]):
-            matched_faqs.append(item)
-
-    if not matched_faqs:
-        await update.message.reply_text("Desculpe, não entendi. Posso te ajudar com o cardápio, horários ou localização?")
-        logger.info(f"Nenhuma FAQ encontrada para: {user_text}")
-    elif len(matched_faqs) == 1:
-        await update.message.reply_text(matched_faqs[0]["resposta"])
-        logger.info(f"Resposta direta da FAQ: {matched_faqs[0]['pergunta']}")
-    else:
-        keyboard = []
-        for faq in matched_faqs:
-            keyboard.append([InlineKeyboardButton(faq["pergunta"], callback_data=str(faq["id"]))])
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            "Encontrei algumas opções. Qual delas você gostaria de saber?", reply_markup=reply_markup
-        )
-        logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[f['pergunta'] for f in matched_faqs]}")
-
-async def button_callback_handler(update: Update, context):
-    query = update.callback_query
-    await query.answer()
-    selected_faq_id = query.data
-    user_name = update.effective_user.first_name
-    logger.info(f"Botão de FAQ pressionado por {user_name}: ID {selected_faq_id}")
-
-    for item in faq_data:
-        if str(item["id"]) == selected_faq_id:
-            await query.message.reply_text(text=item["resposta"])
-            logger.info(f"Resposta da FAQ por botão (nova mensagem): {item['pergunta']}")
-            return
-    logger.warning(f"ID de FAQ não encontrado para callback_data: {selected_faq_id}")
-    await query.message.reply_text(text="Desculpe, não consegui encontrar a informação para essa opção.")
-
-
-async def send_to_gemini(update: Update, context):
-    user_id = update.effective_user.id
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Processa mensagens de texto e tenta encontrar respostas no FAQ."""
     user_message = update.message.text
-    user_name = update.effective_user.first_name
-    logger.info(f"Enviando para Gemini de {user_name} (ID: {user_id}): {user_message}")
+    chat_id = update.effective_chat.id
+    user_full_name = update.effective_user.full_name
+    logger.info(f"Mensagem recebida de {user_full_name} (ID: {chat_id}): {user_message}")
 
-    if user_id not in conversations:
-        logger.info(f"Iniciando nova conversa Gemini para o usuário {user_id}")
-        conversations[user_id] = model.start_chat(history=[])
+    found_faqs = find_faq_answers(user_message)
 
-    try:
-        response = await conversations[user_id].send_message_async(user_message)
-        gemini_response_text = response.text
-        logger.info(f"Resposta do Gemini para {user_id}: {gemini_response_text}")
-        await update.message.reply_text(gemini_response_text)
-    except Exception as e:
-        logger.error(f"Erro ao comunicar com a API Gemini para o usuário {user_id}: {e}", exc_info=True)
-        await update.message.reply_text("Desculpe, não consegui processar sua pergunta com a IA no momento.")
-    finally:
-        # Desativa o modo IA após a resposta do Gemini ou erro
-        context.user_data['using_ai'] = False
-        logger.info(f"Modo IA desativado para o usuário {user_id}.")
-
-
-async def unknown(update: Update, context):
-    logger.info(f"Comando desconhecido recebido: {update.message.text}")
-    await update.message.reply_text("Desculpe, não entendi esse comando. Tente `/start` para começar.")
-
-# --- Configuração do Flask App ---
-flask_app = Flask(__name__)
-
-# Variável global para a aplicação do Telegram (será inicializada uma vez por processo Gunicorn worker)
-application_instance = None
-
-async def get_telegram_application():
-    """Retorna ou cria uma instância da aplicação do Telegram Bot."""
-    global application_instance
-    if application_instance is None:
-        if not TELEGRAM_BOT_TOKEN:
-            logger.critical("TELEGRAM_BOT_TOKEN não está definido. Não é possível criar a aplicação do Telegram.")
-            raise ValueError("TELEGRAM_BOT_TOKEN not set.")
-
-        application_instance = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-        # Adicionando Handlers
-        application_instance.add_handler(CommandHandler("start", start))
-        application_instance.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        application_instance.add_handler(CallbackQueryHandler(button_callback_handler))
-        application_instance.add_handler(MessageHandler(filters.COMMAND, unknown))
-
-        await application_instance.initialize()
-        webhook_url = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
-        if webhook_url:
-            full_webhook_url = f"https://{webhook_url}/api/telegram/webhook"
-            await application_instance.bot.set_webhook(url=full_webhook_url)
-            logger.info(f"Webhook definido para: {full_webhook_url}")
+    if found_faqs:
+        if len(found_faqs) == 1:
+            faq_item = found_faqs[0]
+            logger.info(f"FAQ encontrado para '{user_message}': {faq_item['pergunta']}")
+            await update.message.reply_text(f"Resposta: {faq_item['resposta']}")
         else:
-            logger.warning("RENDER_EXTERNAL_HOSTNAME não definido. Webhook não será configurado automaticamente.")
-        logger.info("Nova instância do Bot Telegram configurada.")
-    return application_instance
+            # Múltiplas FAQs encontradas, oferece botões
+            keyboard = []
+            for faq_item in found_faqs:
+                # O callback_data deve ser uma string única para cada botão
+                # Usamos o 'id' do FAQ como callback_data
+                callback_data = str(faq_item.get("id"))
+                if callback_data: # Certifique-se de que o ID existe
+                    keyboard.append([InlineKeyboardButton(faq_item['pergunta'], callback_data=callback_data)])
+                else:
+                    logger.warning(f"FAQ sem ID encontrado: {faq_item.get('pergunta', 'N/A')}")
 
-@flask_app.route('/api/telegram/webhook', methods=['POST'])
-async def webhook_handler():
-    logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    if request.method == "POST":
-        try:
-            # Obtém a instância da aplicação do Telegram.
-            # Isso garante que cada worker do Gunicorn tenha sua própria instância
-            # ou que a mesma instância seja reutilizada se já estiver configurada.
-            application = await get_telegram_application()
-
-            update = Update.de_json(request.get_json(force=True), application.bot)
-            await application.process_update(update)
-            logger.debug(f"Update processado com sucesso para update_id: {update.update_id}")
-            return jsonify({"status": "ok"}), 200
-        except Exception as e:
-            logger.error(f"Erro ao processar atualização do webhook: {e}", exc_info=True)
-            return jsonify({"status": "error", "message": str(e)}), 500
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[faq['pergunta'] for faq in found_faqs]}")
+            await update.message.reply_text("Encontrei algumas opções. Qual delas você gostaria de saber?", reply_markup=reply_markup)
     else:
-        logger.warning(f"Requisição webhook com método HTTP inesperado: {request.method}")
-        abort(400)
+        logger.info(f"Nenhuma FAQ encontrada para '{user_message}'.")
+        await update.message.reply_text(
+            "Desculpe, não entendi. Posso te ajudar com o cardápio, horários ou localização?"
+        )
 
-# --- Rota de Health Check ---
+async def button_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Lida com as interações de botões inline."""
+    query = update.callback_query
+    user_full_name = update.effective_user.full_name
+    logger.info(f"Botão de FAQ pressionado por {user_full_name}: ID {query.data}")
+
+    # Sempre responda ao callback query para remover o estado de carregamento do botão
+    try:
+        await query.answer()
+    except NetworkError as e:
+        logger.error(f"NetworkError ao responder ao callback query para {user_full_name} (ID: {query.data}): {e}")
+        await query.edit_message_text(text="Desculpe, houve um erro ao processar sua solicitação. Por favor, tente novamente.")
+        return
+    except Exception as e:
+        logger.error(f"Ocorreu um erro inesperado ao responder ao callback query para {user_full_name} (ID: {query.data}): {e}")
+        await query.edit_message_text(text="Ocorreu um erro inesperado. Por favor, tente novamente mais tarde.")
+        return
+
+    selected_faq_id = query.data
+
+    # Encontra a FAQ correspondente ao ID
+    selected_faq = None
+    for item in FAQ_DATA.values():
+        if str(item.get("id")) == selected_faq_id:
+            selected_faq = item
+            break
+
+    if selected_faq:
+        logger.info(f"Respondendo à FAQ selecionada: {selected_faq['pergunta']}")
+        await query.edit_message_text(text=f"Resposta: {selected_faq['resposta']}")
+    else:
+        logger.warning(f"FAQ com ID {selected_faq_id} não encontrada após clique no botão.")
+        await query.edit_message_text(text="Desculpe, a informação selecionada não foi encontrada.")
+
+
+# --- Configuração do Flask e do Bot ---
+
+# Use 0.0.0.0 como host para o Render.com escutar em todas as interfaces.
+# A porta será definida pela variável de ambiente PORT do Render.com.
+PORT = int(os.environ.get('PORT', 5000))
+TOKEN = os.environ.get('BOT_TOKEN') # Variável de ambiente para o token do bot
+
+if not TOKEN:
+    logger.critical("Variável de ambiente 'BOT_TOKEN' não definida. O bot não pode iniciar.")
+    exit(1)
+
+flask_app = Flask(__name__)
+application = None # Será inicializado na primeira requisição ao webhook
+
+async def setup_bot_application():
+    """Configura e retorna a instância do Application do PTB."""
+    global application
+    if application is None:
+        logger.info("Inicializando nova instância do Bot Telegram.")
+        application = Application.builder().token(TOKEN).build()
+
+        # Adiciona handlers
+        application.add_handler(MessageHandler(filters.COMMAND, help_command)) # Primeiro, para comandos desconhecidos
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        application.add_handler(CallbackQueryHandler(button_callback_handler))
+
+        # Define o webhook
+        webhook_url = os.environ.get('WEBHOOK_URL')
+        if not webhook_url:
+            logger.warning("Variável de ambiente 'WEBHOOK_URL' não definida. Usando URL padrão ou tentando inferir.")
+            # Em ambientes como Render, a URL pode ser inferida ou definida por eles
+            # Para testes locais, defina-a explicitamente ou use ngrok
+            webhook_url = f"https://{os.environ.get('RENDER_EXTERNAL_HOSTNAME', 'your-app-name.onrender.com')}/api/telegram/webhook"
+            logger.info(f"Tentando inferir WEBHOOK_URL: {webhook_url}")
+
+        if webhook_url:
+            await application.bot.set_webhook(url=webhook_url)
+            logger.info(f"Webhook definido para: {webhook_url}")
+        else:
+            logger.critical("Não foi possível determinar a WEBHOOK_URL. O bot pode não receber atualizações.")
+
+        logger.info("Nova instância do Bot Telegram configurada.")
+    return application
+
 @flask_app.route('/health', methods=['GET'])
 def health_check():
+    """Endpoint para verificação de saúde."""
     logger.info("Rota /health acessada.")
-    return "OK", 200
+    return jsonify({"status": "ok"}), 200
 
-# Este bloco não é mais necessário para inicializar a aplicação globalmente
-# fora da rota do webhook, pois get_telegram_application() fará isso on-demand.
-# O Gunicorn vai carregar o flask_app, e a primeira requisição vai configurar o bot.
-# A única coisa que podemos fazer aqui é um logging para garantir que o TELEGRAM_BOT_TOKEN exista.
-if not TELEGRAM_BOT_TOKEN:
-    logger.critical("TELEGRAM_BOT_TOKEN não encontrado nas variáveis de ambiente! O bot não pode iniciar corretamente.")
+@flask_app.route('/api/telegram/webhook', methods=['POST'])
+async def telegram_webhook():
+    """Recebe e processa as atualizações do Telegram."""
+    logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
+    app = await setup_bot_application()
 
-# O `if __name__ == '__main__'` não é estritamente necessário para o Render/Gunicorn
-# mas pode ser útil para testes locais.
-if __name__ == '__main__':
-    # Para testar localmente, você pode querer adicionar:
-    # Este bloco executaria o Flask em modo de desenvolvimento.
-    # Em produção com Gunicorn, este bloco não será executado.
-    logger.info("Executando Flask localmente. Isso não acontece no Render com Gunicorn.")
-    # No entanto, a inicialização assíncrona requer um loop de eventos.
-    # asyncio.run(get_telegram_application()) # Para configurar o webhook uma vez
-    # flask_app.run(debug=True, port=5000)
+    # O telegram.ext.Application espera um objeto Update
+    # Convertemos o JSON da requisição para um objeto Update
+    try:
+        update_json = request.get_json()
+        if update_json:
+            update = Update.de_json(update_json, app.bot)
+            logger.debug(f"Update recebido: {update.update_id}")
+            # Processa o update
+            await app.process_update(update)
+            logger.debug(f"Update processado com sucesso para update_id: {update.update_id}")
+            return jsonify({"status": "ok"}), 200
+        else:
+            logger.warning("Requisição POST ao webhook sem JSON.")
+            return jsonify({"status": "bad request", "message": "No JSON payload"}), 400
+    except Exception as e:
+        logger.error(f"Erro ao processar update do Telegram: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+if __name__ == "__main__":
+    # Quando rodado localmente, a inicialização é diferente
+    # Para o Render.com, o Gunicorn irá chamar flask_app.
+    # Esta parte é mais para testar localmente.
+    logger.info("Iniciando bot localmente (modo de desenvolvimento).")
+    async def run_local_bot():
+        # Apenas para teste local sem webhook (polling)
+        # Em produção com webhook, esta parte não será executada diretamente.
+        _app = await setup_bot_application()
+        await _app.run_polling(poll_interval=1) # Use um intervalo maior para evitar banimento do Telegram
+        
+    # Execute a função principal se estiver rodando o script diretamente
+    # Para implantação, o Gunicorn gerenciará o loop de eventos.
+    # No Render.com, o 'gunicorn bot:flask_app' fará a execução.
+    # Evitamos rodar o run_local_bot() diretamente aqui para não interferir com o Gunicorn.
     pass
