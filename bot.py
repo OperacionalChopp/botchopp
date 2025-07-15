@@ -1,3 +1,9 @@
+Perfeito! Aqui está o código bot.py completo com as correções que discutimos, incluindo a remoção do .initialized e a estrutura de inicialização.
+
+Copie e cole este código integralmente no seu arquivo bot.py no GitHub.
+
+Python
+
 import os
 from flask import Flask, request, abort, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -10,6 +16,8 @@ from telegram.ext import (
 )
 import google.generativeai as genai
 import logging
+import asyncio # Adicionado para garantir que esteja disponível
+
 # A importação abaixo assume que faq_data.py está dentro da pasta base_conhecimento/
 # Certifique-se de que faq_data.py está realmente lá e que você removeu a versão da raiz.
 from base_conhecimento.faq_data import faq_data 
@@ -174,7 +182,8 @@ async def setup_bot():
 async def webhook_handler():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
     if request.method == "POST":
-       if application is None: # Apenas verifica se a aplicação foi criada
+        global application # Garante que estamos usando a variável global
+        if application is None: # Apenas verifica se a aplicação foi criada
             logger.error("A aplicação do Telegram não está inicializada. Tentando configurar novamente.")
             try:
                 await setup_bot() # Tenta configurar se não estiver inicializada
@@ -221,7 +230,6 @@ if __name__ == '__main__':
     # Para garantir que o `setup_bot` seja executado uma vez no início,
     # podemos adicionar uma chamada a ele. O Render (ou Gunicorn) executa o script uma vez
     # para carregar o `flask_app`.
-    import asyncio
     try:
         # Tenta executar setup_bot() ao carregar o módulo
         asyncio.run(setup_bot())
