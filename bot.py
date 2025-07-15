@@ -10,7 +10,11 @@ from telegram.ext import (
 )
 import google.generativeai as genai
 import logging
-from base_conhecimento.faq_data import faq_data  # Importação ajustada para a pasta base_conhecimento
+# A linha abaixo precisa ser ajustada dependendo de onde faq_data.py realmente está
+# Se faq_data.py estiver na RAIZ, use: from faq_data import faq_data
+# Se faq_data.py estiver em base_conhecimento/, use: from base_conhecimento.faq_data import faq_data
+# Com base na nossa última conversa, vamos assumir que você o moveu para base_conhecimento/
+from base_conhecimento.faq_data import faq_data 
 
 # --- Configuração de Logging (Mantenha este bloco no topo) ---
 logging.basicConfig(
@@ -132,9 +136,3 @@ async def send_to_gemini(update: Update, context):
         logger.info(f"Resposta do Gemini para {user_id}: {gemini_response_text}")
         await update.message.reply_text(gemini_response_text)
     except Exception as e:
-        logger.error(f"Erro ao comunicar com a API Gemini para o usuário {user_id}: {e}", exc_info=True)
-        await update.message.reply_text("Desculpe, não consegui processar sua pergunta com a IA no momento.")
-    finally:
-        # Desativa o modo IA após a resposta do Gemini ou erro
-        context.user_data['using_ai'] = False
-        logger.info(
