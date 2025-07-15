@@ -232,4 +232,3 @@ if __name__ == '__main__':
         raise
 
     pass # Mantenha o pass se você não tem código de execução local aqui.
-    pass
