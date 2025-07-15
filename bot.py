@@ -148,8 +148,12 @@ async def unknown(update: Update, context):
 # --- Configuração do Flask App ---
 flask_app = Flask(__name__)
 
-# ----------------- INÍCIO DO BLOCO TRY-EXCEPT DE INICIALIZAÇÃO -----------------
-try:
+# Variável global para a aplicação do Telegram (será inicializada)
+application = None
+
+async def setup_bot():
+    """Função para configurar a aplicação do Telegram bot."""
+    global application
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN não está definido nas variáveis de ambiente. O bot não pode ser iniciado.")
 
@@ -161,30 +165,34 @@ try:
     application.add_handler(CallbackQueryHandler(button_callback_handler))
     application.add_handler(MessageHandler(filters.COMMAND, unknown)) # Para comandos não reconhecidos
 
-    # --- Configuração do Webhook ---
-    # Remova ou comente application.run_polling() se estiver aqui.
+    # Inicializa a aplicação para processamento de webhook
+    await application.initialize()
+    logger.info("Aplicação Telegram inicializada para webhooks.")
 
-    @flask_app.route('/api/telegram/webhook', methods=['POST'])
-    async def webhook_handler():
-        logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-        if request.method == "POST":
+
+@flask_app.route('/api/telegram/webhook', methods=['POST'])
+async def webhook_handler():
+    logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
+    if request.method == "POST":
+        if application is None or not application.initialized: # Adiciona verificação
+            logger.error("A aplicação do Telegram não está inicializada. Tentando configurar novamente.")
             try:
-                update = Update.de_json(request.get_json(force=True), application.bot)
-                await application.process_update(update)
-                logger.debug(f"Update processado com sucesso para update_id: {update.update_id}")
-                return jsonify({"status": "ok"}), 200
+                await setup_bot() # Tenta configurar se não estiver inicializada
             except Exception as e:
-                logger.error(f"Erro ao processar atualização do webhook: {e}", exc_info=True)
-                return jsonify({"status": "error", "message": str(e)}), 500
-        else:
-            logger.warning(f"Requisição webhook com método HTTP inesperado: {request.method}")
-            abort(400)
+                logger.critical(f"Falha ao configurar o bot no webhook: {e}", exc_info=True)
+                return jsonify({"status": "error", "message": "Bot initialization failed"}), 500
 
-    logger.info("Bot Telegram e rota de webhook Flask configurados.")
-
-except Exception as e:
-    logger.critical(f"ERRO FATAL NA INICIALIZAÇÃO PRINCIPAL DO BOT: {e}", exc_info=True)
-    raise
+        try:
+            update = Update.de_json(request.get_json(force=True), application.bot)
+            await application.process_update(update)
+            logger.debug(f"Update processado com sucesso para update_id: {update.update_id}")
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            logger.error(f"Erro ao processar atualização do webhook: {e}", exc_info=True)
+            return jsonify({"status": "error", "message": str(e)}), 500
+    else:
+        logger.warning(f"Requisição webhook com método HTTP inesperado: {request.method}")
+        abort(400)
 
 # --- Rota de Health Check ---
 @flask_app.route('/health', methods=['GET'])
@@ -192,12 +200,36 @@ def health_check():
     logger.info("Rota /health acessada.")
     return "OK", 200
 
-# --- Bloco para execução local (não executado no Render com Gunicorn) ---
+# Bloco de inicialização principal para o Gunicorn
 if __name__ == '__main__':
-    # Para testar localmente, descomente as linhas abaixo e defina as variáveis de ambiente
-    # os.environ["TELEGRAM_BOT_TOKEN"] = "SEU_TOKEN_AQUI"
-    # os.environ["GEMINI_API_KEY"] = "SUA_CHAVE_GEMINI_AQUI"
-    # logger.debug("Executando Flask app localmente...")
-    # PORT = int(os.environ.get("PORT", 5000))
-    # flask_app.run(host="0.0.0.0", port=PORT, debug=True)
+    # No Render, o Gunicorn executa o `flask_app` diretamente.
+    # Esta parte abaixo geralmente é para execução LOCAL via `python bot.py`.
+    # Para garantir que o bot seja inicializado mesmo sem uma requisição inicial ao webhook,
+    # podemos adicionar uma chamada para setup_bot() aqui, mas no contexto do Gunicorn,
+    # a primeira requisição ao webhook normalmente acionaria a inicialização.
+    # No entanto, para garantir, vamos usar um hack para executar setup_bot() ao iniciar.
+    # IMPORTANTE: Em ambientes de produção (como o Render com Gunicorn), o __name__ == '__main__'
+    # não é o ponto de entrada principal. O Gunicorn importa o `flask_app` diretamente.
+    # A inicialização deve ser parte do processo de importação do módulo, ou ser acionada pela
+    # primeira requisição.
+
+    # Para Render/Gunicorn, a inicialização será feita na primeira requisição ao webhook
+    # ou podemos usar um mecanismo de inicialização antes do binding do Gunicorn.
+    # Uma forma comum é ter uma função `init_app` que o Gunicorn possa chamar se necessário,
+    # mas para simplificar, a verificação dentro de `webhook_handler` é mais robusta.
+
+    # Para garantir que o `setup_bot` seja executado uma vez no início,
+    # podemos adicionar uma chamada a ele. O Render (ou Gunicorn) executa o script uma vez
+    # para carregar o `flask_app`.
+    import asyncio
+    try:
+        # Tenta executar setup_bot() ao carregar o módulo
+        asyncio.run(setup_bot())
+        logger.info("Bot Telegram configurado na inicialização do módulo.")
+    except Exception as e:
+        logger.critical(f"ERRO FATAL NA CONFIGURAÇÃO INICIAL DO BOT: {e}", exc_info=True)
+        # Re-raise para que o Render saiba que a inicialização falhou
+        raise
+
+    pass # Mantenha o pass se você não tem código de execução local aqui.
     pass
