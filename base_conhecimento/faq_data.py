@@ -697,5 +697,23 @@ faq_data = [
             "multa", "taxa", "material", "equipamento", "chopeira", "barril",
             "comodatado", "logística reversa", "responsabilidade", "aviso"
         ]
-    }
+    },
+    {
+    "id": 54,
+    "pergunta": "Não encontrei minha dúvida. Como posso ser atendido?",
+    "resposta": (
+        "Sentimos muito que você não tenha encontrado a resposta para sua dúvida em nosso FAQ. 😔\n\n"
+        "Para um atendimento mais personalizado, por favor, clique no link abaixo para falar diretamente com nossa equipe via WhatsApp:\n\n"
+        "📱 [**Clique aqui para falar conosco no WhatsApp!**](https://wa.me/556139717502) \n\n"
+        "Ou, se preferir, você pode nos ligar no **(61) 3971-7502**.\n\n"
+        "Estamos prontos para te ajudar!"
+    ),
+    "palavras_chave": [
+        "não encontrei", "minha dúvida", "não achei", "falar com atendente", "contato",
+        "suporte", "ajuda", "whatsapp", "fale conosco", "atendimento", "outro assunto",
+        "telefone", "não consegui a resposta", "não é isso que procuro", "preciso de mais ajuda",
+        "não resolveu", "ainda tenho dúvidas", "falar com alguém", "atendimento humano",
+        "chat", "direcionar", "onde ligo", "qual o numero", "falar com consultor"
+    ]
+}
 ]
