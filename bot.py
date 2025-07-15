@@ -84,6 +84,20 @@ async def handle_message(update: Update, context):
             "Certo! Estou ativando minha mente para suas perguntas. Pode mandar sua dúvida para a IA!"
         )
         context.user_data['using_ai'] = True
+        
+        # Opcional: Remova o teclado de FAQ se estiver presente e o usuário mudar para o modo IA
+        # Isso evita que os botões de FAQ fiquem poluindo a tela quando a interação for com a IA
+        if update.message.reply_markup and isinstance(update.message.reply_markup, InlineKeyboardMarkup):
+            try:
+                # Tenta editar a mensagem anterior do bot para remover os botões
+                # ou edita a própria mensagem do usuário se for a última do bot
+                await update.message.edit_reply_markup(reply_markup=None) 
+                # Nota: edit_reply_markup só funciona se a mensagem foi enviada pelo bot.
+                # Se for a mensagem do usuário, você pode ter que editar a última mensagem do bot
+                # que continha os botões, se tiver o ID dela. Para simplificar,
+                # a nova mensagem acima já "empurra" a antiga para cima.
+            except Exception as e:
+                logger.warning(f"Não foi possível remover o teclado inline ao ativar IA: {e}")
         return
 
     # Se o usuário está no modo IA
@@ -130,13 +144,16 @@ async def button_callback_handler(update: Update, context):
 
     for item in faq_data:
         if str(item["id"]) == selected_faq_id:
-            # Edita a mensagem original com a resposta para remover os botões.
-            # Isso faz com que os botões "desapareçam" após a seleção, que é o comportamento que você descreveu como "normal".
-            await query.edit_message_text(text=item["resposta"])
-            logger.info(f"Resposta da FAQ por botão: {item['pergunta']}")
+            # === ALTERAÇÃO AQUI: USAR reply_text EM VEZ DE edit_message_text ===
+            # Isso fará com que a resposta apareça como uma NOVA mensagem,
+            # deixando os botões originais intactos.
+            await query.message.reply_text(text=item["resposta"])
+            logger.info(f"Resposta da FAQ por botão (nova mensagem): {item['pergunta']}")
             return
     logger.warning(f"ID de FAQ não encontrado para callback_data: {selected_faq_id}")
-    await query.edit_message_text(text="Desculpe, não consegui encontrar a informação para essa opção.")
+    # Se o ID não for encontrado, ainda podemos editar a mensagem de "opções"
+    # para indicar o erro, mas manter os botões se houver outros.
+    await query.message.reply_text(text="Desculpe, não consegui encontrar a informação para essa opção.")
 
 
 async def send_to_gemini(update: Update, context):
