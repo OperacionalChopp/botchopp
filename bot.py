@@ -1,10 +1,9 @@
 import logging
 from flask import Flask, request, jsonify
-from telegram import Update, Bot
-from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup # <-- MUDANÇA AQUI
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler # <-- E AQUI
 import asyncio
 import json
-from telegram.ext import InlineKeyboardButton, InlineKeyboardMarkup
 
 # Configuração de logging
 logging.basicConfig(
