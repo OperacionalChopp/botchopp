@@ -1,4 +1,7 @@
-Flask[async]
-python-telegram-bot
-uvicorn
-gunicorn
+Flask[async]>=3.1.1
+python-telegram-bot==22.2
+uvicorn==0.35.0
+gunicorn==23.0.0
+# Adicione a biblioteca para Redis e RQ
+redis
+rq
