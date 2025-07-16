@@ -40,6 +40,7 @@ WEBHOOK_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}/api/telegram/webhook" if REND
 try:
     # A adição de ssl_cert_reqs=None é crucial para resolver o erro SSL: WRONG_VERSION_NUMBER
     # em alguns ambientes de nuvem como o Redis Cloud usado pelo Render.
+    # Esta linha espera a versão atualizada do Redis (>=4.5.0) para funcionar corretamente com SSL.
     redis_conn = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
     redis_conn.ping()  # Test connection
     logger.info("Conexão com Redis estabelecida com sucesso.")
@@ -62,8 +63,7 @@ else:
     logger.error("Fila RQ não inicializada devido a falha na conexão Redis.")
 
 # --- Carregamento da Base de Conhecimento (FAQ) ---
-# O arquivo faq_data.json deve estar na mesma pasta ou em uma pasta acessível.
-# Certifique-se de que o caminho esteja correto para o seu deploy.
+# O arquivo faq_data.json DEVE estar na mesma pasta do bot.py.
 try:
     with open('faq_data.json', 'r', encoding='utf-8') as f:
         faq_data_raw = json.load(f)
@@ -102,9 +102,9 @@ def generate_faq_response(matched_faqs):
     Se múltiplas forem encontradas, cria botões para cada uma.
     """
     if not matched_faqs:
-        return "Desculpe, não consegui encontrar uma resposta para isso no momento. Poderia reformular sua pergunta ou tentar algo diferente? Se precisar de atendimento humano, digite 'humano'."
+        return "Desculpe, não consegui encontrar uma resposta para isso no momento. Poderia reformular sua pergunta ou tentar algo diferente? Se precisar de atendimento humano, digite 'humano'.", None
     elif len(matched_faqs) == 1:
-        return matched_faqs[0]['resposta']
+        return matched_faqs[0]['resposta'], None
     else:
         # Múltiplas FAQs encontradas, oferece opções ao usuário
         keyboard_buttons = []
@@ -129,10 +129,7 @@ async def handle_message_job(update_json):
     user_message = update.message.text
     logger.info(f"Processando mensagem de {chat_id}: '{user_message}'")
 
-    matched_faqs = find_faqs_by_keywords(user_message)
-    response_text, reply_markup = generate_faq_response(matched_faqs) if matched_faqs else (
-        "Desculpe, não consegui encontrar uma resposta para isso no momento. Poderia reformular sua pergunta ou tentar algo diferente? Se precisar de atendimento humano, digite 'humano'.", None
-    )
+    response_text, reply_markup = generate_faq_response(find_faqs_by_keywords(user_message))
 
     if reply_markup:
         await update.message.reply_text(response_text, reply_markup=reply_markup)
@@ -244,7 +241,7 @@ def health_check():
     return jsonify(status), 200
 
 
-# --- Funções de Startup para o Render (chamadas pelo startup.sh ou Procfile) ---
+# --- Funções de Startup para o Render (chamadas pelo Procfile) ---
 
 async def set_webhook_on_startup():
     """
