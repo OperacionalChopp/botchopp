@@ -5,7 +5,7 @@ from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 import asyncio
 import json
-import threading # Importar threading
+# threading foi removido pois não é mais necessário
 
 # Configuração de logging
 logging.basicConfig(
@@ -14,7 +14,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Seu TOKEN do Bot do Telegram
-TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN") 
+TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # Verificação para garantir que o token foi carregado
 if not TELEGRAM_BOT_TOKEN:
@@ -143,7 +143,7 @@ def buscar_faq(texto_usuario):
     matches = []
     texto_usuario_lower = texto_usuario.lower()
     for item in faq_data:
-        for palavra_chave in item.get("palavras_chave", []): 
+        for palavra_chave in item.get("palavras_chave", []):
             if palavra_chave in texto_usuario_lower:
                 matches.append(item)
                 break
@@ -160,13 +160,13 @@ async def handle_message(update: Update, context):
         logger.info(f"Mensagem recebida de {update.effective_user.first_name} (ID: {update.effective_user.id}): {user_text}")
 
         logger.info(f"Buscando FAQ para o texto: '{user_text}'")
-        
+
         found_faqs = buscar_faq(user_text)
-        
+
         if found_faqs:
             faq_ids = [faq['id'] for faq in found_faqs]
             logger.info(f"FAQs encontradas: IDs {faq_ids}")
-            
+
             if len(found_faqs) == 1:
                 faq_item = found_faqs[0]
                 await update.message.reply_text(faq_item["resposta"], parse_mode='Markdown')
@@ -198,7 +198,7 @@ async def button_callback_handler(update: Update, context):
     faq_item = next((item for item in faq_data if item["id"] == faq_id), None)
 
     if faq_item:
-        await query.edit_message_text(faq_item["resposta"], parse_mode='Markdown') # LINHA CORRIGIDA AQUI
+        await query.edit_message_text(faq_item["resposta"], parse_mode='Markdown')
         logger.info(f"Botão de FAQ pressionado por {query.from_user.first_name}: ID {faq_id}")
     else:
         await query.edit_message_text("Desculpe, não consegui encontrar a resposta para esta opção.", parse_mode='Markdown')
@@ -229,8 +229,8 @@ async def telegram_webhook():
         try:
             bot_instance = Bot(TELEGRAM_BOT_TOKEN)
             update_data = request.get_json(force=True)
-            logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}") 
-            
+            logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}")
+
             logger.info("Tentando colocar a atualização na fila da aplicação do Telegram.")
             await application.update_queue.put(Update.de_json(update_data, bot_instance))
             logger.info("Atualização colocada na fila com sucesso.")
@@ -268,38 +268,37 @@ async def set_webhook_on_startup():
         logger.error(f"Erro ao configurar webhook: {e}", exc_info=True)
 
 
-# --- NOVO BLOCO CRITICO AQUI ---
-def run_ptb_application():
-    if application:
-        logger.info("Iniciando a execução da aplicação do python-telegram-bot (em thread separada).")
-        
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-        
-        # Usar run_polling para processar a fila interna do PTB
-        new_loop.run_until_complete(application.run_polling())
-        logger.info("Execução da aplicação do python-telegram-bot finalizada.")
-    else:
-        logger.warning("Não foi possível iniciar a aplicação do python-telegram-bot, pois não foi construída.")
-
-# Função a ser chamada pelo Procfile para iniciar o Flask e o PTB
+# --- ESTA É A FUNÇÃO run_bot_and_server QUE DEVE ESTAR NO SEU ARQUIVO ---
+# Função a ser chamada pelo Procfile para iniciar o Flask
+# e configurar o webhook do PTB
 def run_bot_and_server():
-    # Inicia a aplicação do python-telegram-bot em uma thread separada
-    ptb_thread = threading.Thread(target=run_ptb_application, daemon=True)
-    ptb_thread.start()
-    logger.info("Thread do python-telegram-bot iniciada.")
-    
-    # Configura o webhook uma vez ao iniciar
-    asyncio.run(set_webhook_on_startup())
-    
+    logger.info("Iniciando setup do ambiente para o bot e servidor Flask.")
+    # Configura o webhook uma vez ao iniciar o serviço
+    # Isso é crucial para que o Telegram saiba para onde enviar as atualizações.
+    # Precisamos aguardar esta operação assíncrona.
+    try:
+        asyncio.run(set_webhook_on_startup())
+        logger.info("Webhook configurado com sucesso (ou já estava configurado).")
+    except Exception as e:
+        logger.error(f"Falha ao configurar o webhook na inicialização: {e}", exc_info=True)
+        # Dependendo da criticidade, você pode querer sair ou continuar
+        # Se o webhook não configurar, o bot não receberá mensagens do Telegram.
+
+    # Não precisamos chamar application.run_polling() ou application.start() aqui.
+    # A aplicação do python-telegram-bot (application) já está construída
+    # (se o token estiver ok) e seus handlers estão registrados.
+    # O Flask, rodando via Gunicorn, vai receber os updates do Telegram
+    # e passá-los para application.update_queue, que o PTB sabe como processar.
+    # Apenas garantir que o Flask esteja pronto para ser iniciado.
     logger.info("Servidor Flask pronto para ser iniciado pelo Gunicorn.")
 
 # Este bloco só é executado se o arquivo for rodado diretamente (para testes locais)
 if __name__ == '__main__':
     logger.info("Executando bot.py no bloco __main__ (provavelmente para teste local).")
-    # Para teste local, você pode chamar run_bot_and_server() aqui, mas no Render, o Procfile fará isso.
-    # Para rodar localmente, o webhook não funcionará, mas o polling sim.
-    # Exemplo para testar polling localmente (comente o run_bot_and_server() acima se for usar):
-    # if application:
-    #     application.run_polling()
+    # Para teste local SEM Gunicorn, você poderia usar:
+    # asyncio.run(set_webhook_on_startup())
+    # application.run_polling() # Para testar localmente via polling
+
+    # No Render, o Procfile chamará run_bot_and_server() e o Gunicorn iniciará o Flask.
+    # Portanto, não precisamos do flask_app.run() aqui.
     pass
