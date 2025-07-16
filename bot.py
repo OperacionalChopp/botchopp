@@ -241,7 +241,14 @@ async def telegram_webhook():
 
             logger.info("Tentando colocar a atualização na fila da aplicação do Telegram.")
             # Coloca a atualização na fila para ser processada pela aplicação do PTB
-            await application.update_queue.put(Update.de_json(update_data, bot_instance))
+            # Precisamos usar um loop de eventos para esta operação assíncrona
+            if asyncio.get_event_loop().is_running():
+                # Se já há um loop rodando (ex: Gunicorn com uvicorn workers), usa ele
+                asyncio.create_task(application.update_queue.put(Update.de_json(update_data, bot_instance)))
+            else:
+                # Caso contrário, roda em um novo loop (menos comum em ambiente Gunicorn + Flask assíncrono)
+                await application.update_queue.put(Update.de_json(update_data, bot_instance))
+
             logger.info("Atualização colocada na fila com sucesso.")
 
             return jsonify({"status": "ok"}), 200
@@ -276,22 +283,26 @@ async def set_webhook_on_startup():
     except Exception as e:
         logger.error(f"Erro ao configurar webhook: {e}", exc_info=True)
 
-# NOVO: Função para rodar a aplicação do python-telegram-bot em uma thread separada
+# Função para rodar a aplicação do python-telegram-bot em uma thread separada
 def run_ptb_application():
     if application:
-        # Cria um novo loop de eventos para esta thread
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
+        # Pega ou cria um novo loop de eventos para esta thread.
+        # Isso garante que a thread tem seu próprio ambiente assíncrono.
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
         logger.info("Iniciando a execução da aplicação do python-telegram-bot (em thread separada com run_forever).")
         try:
-            # application.run_forever() é a forma correta para webhook quando o PTB não gerencia o servidor
-            new_loop.run_until_complete(application.run_forever())
+            loop.run_until_complete(application.run_forever())
         except Exception as e:
             logger.error(f"ERRO CRÍTICO no loop de run_forever do PTB: {e}", exc_info=True)
         finally:
             # Garante que o loop é fechado quando a aplicação para
-            new_loop.close()
+            if not loop.is_closed():
+                loop.close()
         logger.info("Thread do python-telegram-bot encerrada.")
     else:
         logger.critical("Aplicação do python-telegram-bot não pode ser iniciada em thread separada pois o token não foi carregado.")
@@ -304,10 +315,21 @@ def run_bot_and_server():
 
     # 1. Configura o webhook uma vez ao iniciar o serviço
     try:
+        # A configuração do webhook precisa ser executada no loop de eventos principal
+        # se Gunicorn/Flask não tiver um loop já rodando.
+        # No Render, o Gunicorn pode ter seu próprio loop. Vamos tentar isso:
         asyncio.run(set_webhook_on_startup())
         logger.info("Webhook configurado com sucesso (ou já estava configurado).")
-    except Exception as e:
-        logger.error(f"Falha ao configurar o webhook na inicialização: {e}", exc_info=True)
+    except RuntimeError:
+        # Se um loop já estiver rodando (ex: por outro worker do Gunicorn ou Uvicorn),
+        # agendamos a tarefa para ele.
+        current_loop = asyncio.get_event_loop()
+        if current_loop.is_running():
+            current_loop.create_task(set_webhook_on_startup())
+            logger.info("Webhook agendado para configuração no loop existente.")
+        else:
+            logger.error("Não foi possível configurar o webhook na inicialização: nenhum loop de eventos disponível e um RuntimeEror ocorreu.")
+            raise # Re-lança o erro se for crítico
 
     # 2. Inicia o loop de eventos do python-telegram-bot em uma thread separada
     if application:
