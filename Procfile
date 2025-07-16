@@ -1,1 +1,1 @@
-python -c "import asyncio; from bot import set_webhook_on_startup; asyncio.run(set_webhook_on_startup())" && gunicorn bot:flask_app --bind 0.0.0.0:$PORT
+web: python -c "from bot import run_bot_and_server; run_bot_and_server()" && gunicorn bot:flask_app --bind 0.0.0.0:$PORT
