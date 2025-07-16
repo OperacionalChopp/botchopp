@@ -2,7 +2,7 @@ import logging
 import os
 from flask import Flask, request, jsonify
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler # Importe CommandHandler
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 import asyncio
 import json
 
@@ -96,9 +96,9 @@ faq_data = [
         "palavras_chave": [
             "não encontrei", "minha dúvida", "não achei", "falar com atendente", "contato",
             "suporte", "ajuda", "whatsapp", "fale conosco", "atendimento", "outro assunto",
-            "telefone", "não consegui a resposta", "não é isso que procuro", "preciso de mais ajuda",
-            "não resolveu", "ainda tenho dúvidas", "falar com alguém", "atendimento humano",
-            "chat", "direcionar", "onde ligo", "qual o numero", "falar com consultor"
+            "telefone", "não consegui a resposta", "qual o numero", "falar com consultor",
+            "não é isso que procuro", "preciso de mais ajuda", "não resolveu", "ainda tenho dúvidas",
+            "falar com alguém", "atendimento humano", "chat", "direcionar", "onde ligo"
         ]
     },
     {
@@ -143,7 +143,8 @@ def buscar_faq(texto_usuario):
     texto_usuario_lower = texto_usuario.lower()
     for item in faq_data:
         # CORREÇÃO CRÍTICA AQUI: de "palavras_chavqwe" para "palavras_chave"
-        for palavra_chave in item.get("palavras_chave", []):
+        # Garanta que esta linha está assim no seu bot.py
+        for palavra_chave in item.get("palavras_chave", []): 
             if palavra_chave in texto_usuario_lower:
                 matches.append(item)
                 break
@@ -157,7 +158,18 @@ async def handle_message(update: Update, context):
     user_text = update.message.text
     logger.info(f"Mensagem recebida de {update.effective_user.first_name} (ID: {update.effective_user.id}): {user_text}")
 
+    # --- NOVOS LOGS DE DEPURACAO AQUI ---
+    logger.info(f"Buscando FAQ para o texto: '{user_text}'")
+    
     found_faqs = buscar_faq(user_text)
+    
+    # Adicionando um log mais detalhado sobre o resultado da busca
+    if found_faqs:
+        faq_ids = [faq['id'] for faq in found_faqs]
+        logger.info(f"FAQs encontradas: IDs {faq_ids}")
+    else:
+        logger.info("Nenhuma FAQ encontrada para o texto.")
+    # --- FIM DOS NOVOS LOGS DE DEPURACAO ---
 
     if found_faqs:
         if len(found_faqs) == 1:
@@ -203,7 +215,7 @@ else:
 
 # Adicionar handlers (apenas se a aplicação foi construída com sucesso)
 if application:
-    application.add_handler(CommandHandler("start", start)) # Adicionado o handler para /start
+    application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback_handler))
 
@@ -218,9 +230,15 @@ def health_check():
 async def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
     if TELEGRAM_BOT_TOKEN:
-        bot_instance = Bot(TELEGRAM_BOT_TOKEN)
-        await application.update_queue.put(Update.de_json(request.get_json(force=True), bot_instance))
-        return jsonify({"status": "ok"}), 200
+        try:
+            bot_instance = Bot(TELEGRAM_BOT_TOKEN)
+            update_data = request.get_json(force=True)
+            logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}") # Log da atualização bruta formatada
+            await application.update_queue.put(Update.de_json(update_data, bot_instance))
+            return jsonify({"status": "ok"}), 200
+        except Exception as e:
+            logger.error(f"Erro ao processar atualização do webhook: {e}")
+            return jsonify({"status": "error", "message": str(e)}), 500
     else:
         logger.error("Requisição de webhook recebida, mas o TOKEN do bot não está configurado.")
         return jsonify({"status": "error", "message": "Bot token not configured"}), 500
