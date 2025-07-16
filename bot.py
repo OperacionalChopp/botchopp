@@ -5,7 +5,7 @@ from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 import asyncio
 import json
-import threading # Re-adicionado para rodar o PTB em uma thread separada
+import threading
 
 # Configuração de logging
 logging.basicConfig(
@@ -19,7 +19,6 @@ TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 # Verificação para garantir que o token foi carregado
 if not TELEGRAM_BOT_TOKEN:
     logger.error("ERRO: A variável de ambiente 'BOT_TOKEN' não foi encontrada. Certifique-se de que está configurada no Render.")
-    # raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set.") # Não vamos parar a aplicação, apenas logar o erro
 
 WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook" # Seu webhook do Render.com
 
@@ -151,40 +150,46 @@ def buscar_faq(texto_usuario):
 # Handlers do Telegram Bot
 async def start(update: Update, context):
     logger.info(f"Comando /start recebido de {update.effective_user.first_name} (ID: {update.effective_user.id})")
-    await update.message.reply_text('Olá! Bem-vindo ao CHOPP Digital. Como posso te ajudar hoje?')
+    try:
+        await update.message.reply_text('Olá! Bem-vindo ao CHOPP Digital. Como posso te ajudar hoje?')
+        logger.info(f"Resposta enviada para /start para {update.effective_user.id}")
+    except Exception as e:
+        logger.error(f"Erro ao responder ao comando /start para {update.effective_user.id}: {e}", exc_info=True)
 
 async def handle_message(update: Update, context):
     user_text = update.message.text
-    if user_text: # Garante que há texto na mensagem antes de processar
+    if user_text:
         logger.info(f"Mensagem recebida de {update.effective_user.first_name} (ID: {update.effective_user.id}): {user_text}")
-
         logger.info(f"Buscando FAQ para o texto: '{user_text}'")
 
-        found_faqs = buscar_faq(user_text)
+        try:
+            found_faqs = buscar_faq(user_text)
 
-        if found_faqs:
-            faq_ids = [faq['id'] for faq in found_faqs]
-            logger.info(f"FAQs encontradas: IDs {faq_ids}")
+            if found_faqs:
+                faq_ids = [faq['id'] for faq in found_faqs]
+                logger.info(f"FAQs encontradas: IDs {faq_ids}")
 
-            if len(found_faqs) == 1:
-                faq_item = found_faqs[0]
-                await update.message.reply_text(faq_item["resposta"], parse_mode='Markdown')
-                logger.info(f"FAQ encontrada e enviada: ID {faq_item['id']}")
+                if len(found_faqs) == 1:
+                    faq_item = found_faqs[0]
+                    await update.message.reply_text(faq_item["resposta"], parse_mode='Markdown')
+                    logger.info(f"FAQ encontrada e enviada: ID {faq_item['id']} para {update.effective_user.id}")
+                else:
+                    keyboard = []
+                    for faq_item in found_faqs:
+                        keyboard.append([InlineKeyboardButton(faq_item["pergunta"], callback_data=str(faq_item["id"]))])
+                    reply_markup = InlineKeyboardMarkup(keyboard)
+                    await update.message.reply_text('Encontrei algumas opções. Qual delas você gostaria de saber?', reply_markup=reply_markup)
+                    logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[faq['pergunta'] for faq in found_faqs]} para {update.effective_user.id}")
             else:
-                keyboard = []
-                for faq_item in found_faqs:
-                    keyboard.append([InlineKeyboardButton(faq_item["pergunta"], callback_data=str(faq_item["id"]))])
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                await update.message.reply_text('Encontrei algumas opções. Qual delas você gostaria de saber?', reply_markup=reply_markup)
-                logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[faq['pergunta'] for faq in found_faqs]}")
-        else:
-            fallback_faq = next((item for item in faq_data if item["id"] == 54), None)
-            if fallback_faq:
-                await update.message.reply_text(fallback_faq["resposta"], parse_mode='Markdown')
-                logger.info("Nenhuma FAQ encontrada. Enviando resposta de fallback (ID 54).")
-            else:
-                await update.message.reply_text("Desculpe, não consegui encontrar uma resposta para sua pergunta. Por favor, tente reformular ou entre em contato diretamente.")
-                logger.info("Nenhuma FAQ encontrada e fallback (ID 54) não configurado.")
+                fallback_faq = next((item for item in faq_data if item["id"] == 54), None)
+                if fallback_faq:
+                    await update.message.reply_text(fallback_faq["resposta"], parse_mode='Markdown')
+                    logger.info(f"Nenhuma FAQ encontrada. Enviando resposta de fallback (ID 54) para {update.effective_user.id}.")
+                else:
+                    await update.message.reply_text("Desculpe, não consegui encontrar uma resposta para sua pergunta. Por favor, tente reformular ou entre em contato diretamente.")
+                    logger.info(f"Nenhuma FAQ encontrada e fallback (ID 54) não configurado para {update.effective_user.id}.")
+        except Exception as e:
+            logger.error(f"Erro ao processar mensagem ou enviar resposta para {update.effective_user.id}: {e}", exc_info=True)
     else:
         logger.warning(f"Mensagem recebida sem texto de {update.effective_user.first_name} (ID: {update.effective_user.id}). Ignorando.")
 
@@ -196,12 +201,16 @@ async def button_callback_handler(update: Update, context):
     faq_id = int(query.data)
     faq_item = next((item for item in faq_data if item["id"] == faq_id), None)
 
-    if faq_item:
-        await query.edit_message_text(faq_item["resposta"], parse_mode='Markdown')
-        logger.info(f"Botão de FAQ pressionado por {query.from_user.first_name}: ID {faq_id}")
-    else:
-        await query.edit_message_text("Desculpe, não consegui encontrar a resposta para esta opção.", parse_mode='Markdown')
-        logger.warning(f"Botão de FAQ pressionado com ID inválido: {faq_id}")
+    try:
+        if faq_item:
+            await query.edit_message_text(faq_item["resposta"], parse_mode='Markdown')
+            logger.info(f"Botão de FAQ pressionado e resposta enviada por {query.from_user.first_name}: ID {faq_id}")
+        else:
+            await query.edit_message_text("Desculpe, não consegui encontrar a resposta para esta opção.", parse_mode='Markdown')
+            logger.warning(f"Botão de FAQ pressionado com ID inválido: {faq_id} por {query.from_user.first_name}")
+    except Exception as e:
+        logger.error(f"Erro ao processar callback de botão ou editar mensagem para {query.from_user.id}: {e}", exc_info=True)
+
 
 # Setup do Application
 application = None
@@ -224,7 +233,7 @@ def health_check():
 @flask_app.route("/api/telegram/webhook", methods=["POST"])
 async def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    if TELEGRAM_BOT_TOKEN and application: # Garante que a aplicação foi construída
+    if TELEGRAM_BOT_TOKEN and application:
         try:
             bot_instance = Bot(TELEGRAM_BOT_TOKEN)
             update_data = request.get_json(force=True)
@@ -273,14 +282,13 @@ def run_ptb_application():
         # Cria um novo loop de eventos para esta thread
         new_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(new_loop)
-        
+
         logger.info("Iniciando a execução da aplicação do python-telegram-bot (em thread separada com run_forever).")
-        # run_forever() é apropriado para webhooks, pois mantém o loop ativo
-        # para processar a fila de updates, mas não tenta iniciar um servidor web.
         try:
+            # application.run_forever() é a forma correta para webhook quando o PTB não gerencia o servidor
             new_loop.run_until_complete(application.run_forever())
         except Exception as e:
-            logger.error(f"Erro no loop de run_forever do PTB: {e}", exc_info=True)
+            logger.error(f"ERRO CRÍTICO no loop de run_forever do PTB: {e}", exc_info=True)
         finally:
             # Garante que o loop é fechado quando a aplicação para
             new_loop.close()
@@ -289,20 +297,17 @@ def run_ptb_application():
         logger.critical("Aplicação do python-telegram-bot não pode ser iniciada em thread separada pois o token não foi carregado.")
 
 
-# --- ESTA É A FUNÇÃO run_bot_and_server QUE DEVE ESTAR NO SEU ARQUIVO ---
 # Função a ser chamada pelo Procfile para iniciar o Flask
 # e configurar o webhook do PTB
 def run_bot_and_server():
     logger.info("Iniciando setup do ambiente para o bot e servidor Flask.")
-    
+
     # 1. Configura o webhook uma vez ao iniciar o serviço
     try:
         asyncio.run(set_webhook_on_startup())
         logger.info("Webhook configurado com sucesso (ou já estava configurado).")
     except Exception as e:
         logger.error(f"Falha ao configurar o webhook na inicialização: {e}", exc_info=True)
-        # Se o webhook não configurar, o bot não receberá mensagens do Telegram.
-        # Mas não vamos interromper o servidor Flask.
 
     # 2. Inicia o loop de eventos do python-telegram-bot em uma thread separada
     if application:
@@ -324,4 +329,3 @@ if __name__ == '__main__':
     # No Render, o Procfile chamará run_bot_and_server() e o Gunicorn iniciará o Flask.
     # Portanto, não precisamos do flask_app.run() aqui.
     pass
-        
