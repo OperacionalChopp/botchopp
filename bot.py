@@ -146,7 +146,7 @@ def buscar_faq(texto_usuario):
     matches = []
     texto_usuario_lower = texto_usuario.lower()
     for item in faq_data:
-        for palavra_chave in item.get("palavras_chavqwe", []):
+        for palavra_chave in item.get("palavras_chave", []):
             if palavra_chave in texto_usuario_lower:
                 matches.append(item)
                 break
