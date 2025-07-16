@@ -2,5 +2,5 @@ Flask[async]>=3.1.1
 python-telegram-bot==22.2
 uvicorn==0.35.0
 gunicorn==23.0.0
-redis>=4.5.0
+redis>=7.0.0  # MUDANÇA AQUI: Versão 7.0.0 ou superior para melhor SSL
 rq
