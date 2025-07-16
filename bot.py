@@ -7,7 +7,8 @@ from flask import Flask, request, jsonify
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 # Importar o ApplicationBuilder diretamente para melhor legibilidade
-from telegram.ext.application import ApplicationBuilder
+from telegram.ext import ApplicationBuilder
+
 
 # Para a fila com Redis
 import redis
