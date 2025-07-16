@@ -5,6 +5,7 @@ from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 import asyncio
 import json
+import threading # Importar threading
 
 # Configuração de logging
 logging.basicConfig(
@@ -69,7 +70,7 @@ faq_data = [
             "- Caso a rota não atenda à necessidade, o cliente deve providenciar um substituto para liberar o material.\n\n"
             "**MULTA:**\n"
             "A partir de quinta-feira será cobrada taxa diária de R$100,00/dia pela não disponibilidade de recolha.\n\n"
-            "**IMPORTANTE!**\n"
+            "**IMPORTANT!**\n"
             "- Todos os materiais devem estar prontos e em perfeita condição para recolha.\n"
             "- É necessário que haja um responsável no local para liberar o acesso.\n"
             "- A guarda dos materiais é responsabilidade do cliente, sujeito a cobrança em caso de perda ou dano.\n"
@@ -197,82 +198,4 @@ async def button_callback_handler(update: Update, context):
     faq_item = next((item for item in faq_data if item["id"] == faq_id), None)
 
     if faq_item:
-        await query.edit_message_text(faq_item["resposta"], parse_mode='Markdown')
-        logger.info(f"Botão de FAQ pressionado por {query.from_user.first_name}: ID {faq_id}")
-    else:
-        await query.edit_message_text("Desculpe, não consegui encontrar a resposta para esta opção.", parse_mode='Markdown')
-        logger.warning(f"Botão de FAQ pressionado com ID inválido: {faq_id}")
-
-# Setup do Application
-if TELEGRAM_BOT_TOKEN:
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-else:
-    logger.critical("Não foi possível iniciar o aplicativo Telegram pois o token não foi carregado.")
-    application = None
-
-# Adicionar handlers (apenas se a aplicação foi construída com sucesso)
-if application:
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(button_callback_handler))
-
-# Rota para o health check do Render.com
-@flask_app.route("/health", methods=["GET"])
-def health_check():
-    logger.info("Rota /health acessada.")
-    return "OK", 200
-
-# Rota do Webhook do Telegram
-@flask_app.route("/api/telegram/webhook", methods=["POST"])
-async def telegram_webhook():
-    logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    if TELEGRAM_BOT_TOKEN and application: # Garante que a aplicação foi construída
-        try:
-            bot_instance = Bot(TELEGRAM_BOT_TOKEN)
-            update_data = request.get_json(force=True)
-            logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}") 
-            
-            # --- NOVO PONTO DE DEPURACAO CRITICO AQUI ---
-            logger.info("Tentando colocar a atualização na fila da aplicação do Telegram.")
-            await application.update_queue.put(Update.de_json(update_data, bot_instance))
-            logger.info("Atualização colocada na fila com sucesso.")
-            # --- FIM DO NOVO PONTO DE DEPURACAO ---
-
-            return jsonify({"status": "ok"}), 200
-        except Exception as e:
-            logger.error(f"Erro ao processar atualização do webhook ou colocar na fila: {e}", exc_info=True) # exc_info=True para stack trace
-            return jsonify({"status": "error", "message": str(e)}), 500
-    else:
-        if not TELEGRAM_BOT_TOKEN:
-            logger.error("Requisição de webhook recebida, mas o TOKEN do bot não está configurado.")
-            return jsonify({"status": "error", "message": "Bot token not configured"}), 500
-        else: # application é None
-            logger.error("Requisição de webhook recebida, mas a aplicação do Telegram não foi inicializada corretamente.")
-            return jsonify({"status": "error", "message": "Telegram Application not initialized"}), 500
-
-# Função para configurar o webhook na inicialização
-async def set_webhook_on_startup():
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("Não é possível configurar o webhook: TOKEN do bot não está disponível.")
-        return
-
-    try:
-        bot_instance = Bot(TELEGRAM_BOT_TOKEN)
-        webhook_info = await bot_instance.get_webhook_info()
-        current_webhook_url = webhook_info.url
-
-        if current_webhook_url != WEBHOOK_URL:
-            logger.info(f"URL do webhook atual ({current_webhook_url}) é diferente da desejada ({WEBHOOK_URL}). Configurando...")
-            await bot_instance.set_webhook(url=WEBHOOK_URL)
-            logger.info(f"Webhook definido para: {WEBHOOK_URL}")
-        else:
-            logger.info("Webhook já está configurado corretamente.")
-    except Exception as e:
-        logger.error(f"Erro ao configurar webhook: {e}", exc_info=True) # exc_info=True para stack trace
-
-if __name__ == '__main__':
-    logger.info("Executando bot.py no bloco __main__ (provavelmente para teste local).")
-    # Para testes locais ou para garantir que o webhook é configurado se o script for executado diretamente
-    # asyncio.run(set_webhook_on_startup()) 
-    # flask_app.run(debug=True, port=5000) # Remover para produção no Render
-    pass
+        await query.edit_message_text(faq_item
