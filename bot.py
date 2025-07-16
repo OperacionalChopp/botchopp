@@ -46,8 +46,9 @@ else:
 redis_conn = None
 q = None
 try:
-    redis_conn = redis.from_url(REDIS_URL)
-    # Teste de conexão simples
+redis_conn = redis.from_url(REDIS_URL, ssl_cert_reqs=None)
+
+# Teste de conexão simples
     redis_conn.ping()
     q = Queue(connection=redis_conn)
     logger.info(f"Conectado ao Redis em: {REDIS_URL}")
