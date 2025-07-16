@@ -1,11 +1,15 @@
 import logging
 import os
-from flask import Flask, request, jsonify
-from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 import asyncio
 import json
 import threading
+from flask import Flask, request, jsonify
+from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
+
+# Para a fila com Redis
+import redis
+from rq import Queue
 
 # Configuração de logging
 logging.basicConfig(
@@ -16,16 +20,35 @@ logger = logging.getLogger(__name__)
 # Seu TOKEN do Bot do Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+# URL do Redis (do Render)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0") # Render popula REDIS_URL automaticamente
+
 # Verificação para garantir que o token foi carregado
 if not TELEGRAM_BOT_TOKEN:
     logger.error("ERRO: A variável de ambiente 'BOT_TOKEN' não foi encontrada. Certifique-se de que está configurada no Render.")
 
-WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook" # Seu webhook do Render.com
+WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if WEBHOOK_URL:
+    WEBHOOK_URL = f"https://{WEBHOOK_URL}/api/telegram/webhook"
+else:
+    WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook" # Fallback
+
+# Conecta ao Redis
+try:
+    redis_conn = redis.from_url(REDIS_URL)
+    q = Queue(connection=redis_conn)
+    logger.info(f"Conectado ao Redis em: {REDIS_URL}")
+except Exception as e:
+    logger.critical(f"ERRO: Não foi possível conectar ao Redis em {REDIS_URL}: {e}", exc_info=True)
+    # No ambiente de produção, você pode querer sair ou ter um fallback
+    redis_conn = None
+    q = None
 
 # Instância do Flask
 flask_app = Flask(__name__)
 
 # Dados do FAQ (exemplo simplificado, você carregaria do seu JSON)
+# ... (manter seu faq_data completo aqui)
 faq_data = [
     {
         "id": 1,
@@ -147,7 +170,7 @@ def buscar_faq(texto_usuario):
                 break
     return matches
 
-# Handlers do Telegram Bot
+# Handlers do Telegram Bot (assíncronos, serão chamados pelo Worker)
 async def start(update: Update, context):
     logger.info(f"Comando /start recebido de {update.effective_user.first_name} (ID: {update.effective_user.id})")
     try:
@@ -212,58 +235,66 @@ async def button_callback_handler(update: Update, context):
         logger.error(f"Erro ao processar callback de botão ou editar mensagem para {query.from_user.id}: {e}", exc_info=True)
 
 
-# Setup do Application
+# Setup do Application (global para o worker)
 application = None
 if TELEGRAM_BOT_TOKEN:
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-    # Adicionar handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback_handler))
 else:
     logger.critical("Não foi possível iniciar o aplicativo Telegram pois o token não foi carregado.")
 
-# Rota para o health check do Render.com
+
+# Função para processar updates (será enfileirada e executada pelo worker)
+async def process_telegram_update(update_json: dict):
+    if not TELEGRAM_BOT_TOKEN:
+        logger.error("Não é possível processar a atualização: TOKEN do bot não está disponível.")
+        return
+
+    if not application:
+        logger.error("Não é possível processar a atualização: A aplicação do Telegram não foi inicializada.")
+        return
+
+    try:
+        # Re-cria o bot_instance para o contexto atual do worker
+        bot_instance = Bot(TELEGRAM_BOT_TOKEN)
+        update = Update.de_json(update_json, bot_instance)
+        logger.info(f"Processando update ID: {update.update_id} na fila do RQ.")
+        await application.process_update(update)
+        logger.info(f"Update ID: {update.update_id} processado com sucesso.")
+    except Exception as e:
+        logger.error(f"Erro ao processar update {update_json.get('update_id', 'N/A')} na fila: {e}", exc_info=True)
+
+
+# Rota para o health check do Render.com (para o Web Service)
 @flask_app.route("/health", methods=["GET"])
 def health_check():
     logger.info("Rota /health acessada.")
     return "OK", 200
 
-# Rota do Webhook do Telegram
+# Rota do Webhook do Telegram (para o Web Service)
 @flask_app.route("/api/telegram/webhook", methods=["POST"])
-async def telegram_webhook():
+def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    if TELEGRAM_BOT_TOKEN and application:
+    if q: # Verifica se a fila foi inicializada
         try:
-            bot_instance = Bot(TELEGRAM_BOT_TOKEN)
             update_data = request.get_json(force=True)
             logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}")
 
-            logger.info("Tentando colocar a atualização na fila da aplicação do Telegram.")
-            # Coloca a atualização na fila para ser processada pela aplicação do PTB
-            # Precisamos usar um loop de eventos para esta operação assíncrona
-            if asyncio.get_event_loop().is_running():
-                # Se já há um loop rodando (ex: Gunicorn com uvicorn workers), usa ele
-                asyncio.create_task(application.update_queue.put(Update.de_json(update_data, bot_instance)))
-            else:
-                # Caso contrário, roda em um novo loop (menos comum em ambiente Gunicorn + Flask assíncrono)
-                await application.update_queue.put(Update.de_json(update_data, bot_instance))
+            # Enfileira a atualização para ser processada pelo worker
+            job = q.enqueue(process_telegram_update, update_data, job_timeout='5m') # Aumentar timeout se precisar
+            logger.info(f"Atualização enfileirada para o RQ. Job ID: {job.id}")
 
-            logger.info("Atualização colocada na fila com sucesso.")
-
-            return jsonify({"status": "ok"}), 200
+            return jsonify({"status": "ok", "job_id": job.id}), 200
         except Exception as e:
-            logger.error(f"Erro ao processar atualização do webhook ou colocar na fila: {e}", exc_info=True)
+            logger.error(f"Erro ao enfileirar atualização do webhook: {e}", exc_info=True)
             return jsonify({"status": "error", "message": str(e)}), 500
     else:
-        if not TELEGRAM_BOT_TOKEN:
-            logger.error("Requisição de webhook recebida, mas o TOKEN do bot não está configurado.")
-            return jsonify({"status": "error", "message": "Bot token not configured"}), 500
-        else: # application é None
-            logger.error("Requisição de webhook recebida, mas a aplicação do Telegram não foi inicializada corretamente.")
-            return jsonify({"status": "error", "message": "Telegram Application not initialized"}), 500
+        logger.error("Requisição de webhook recebida, mas a fila do Redis não está disponível.")
+        return jsonify({"status": "error", "message": "Redis Queue not initialized"}), 500
 
-# Função para configurar o webhook na inicialização
+# Função para configurar o webhook na inicialização (para o Web Service)
 async def set_webhook_on_startup():
     if not TELEGRAM_BOT_TOKEN:
         logger.error("Não é possível configurar o webhook: TOKEN do bot não está disponível.")
@@ -283,37 +314,9 @@ async def set_webhook_on_startup():
     except Exception as e:
         logger.error(f"Erro ao configurar webhook: {e}", exc_info=True)
 
-# Função para rodar a aplicação do python-telegram-bot em uma thread separada
-def run_ptb_application():
-    if application:
-        # Pega ou cria um novo loop de eventos para esta thread.
-        # Isso garante que a thread tem seu próprio ambiente assíncrono.
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        logger.info("Iniciando a execução da aplicação do python-telegram-bot (em thread separada com run_forever).")
-        try:
-            loop.run_until_complete(application.run_forever())
-        except Exception as e:
-            logger.error(f"ERRO CRÍTICO no loop de run_forever do PTB: {e}", exc_info=True)
-        finally:
-            # Garante que o loop é fechado quando a aplicação para
-            if not loop.is_closed():
-                loop.close()
-        logger.info("Thread do python-telegram-bot encerrada.")
-    else:
-        logger.critical("Aplicação do python-telegram-bot não pode ser iniciada em thread separada pois o token não foi carregado.")
-
-
-# Função a ser chamada pelo Procfile para iniciar o Flask
-# e configurar o webhook do PTB
-def run_bot_and_server():
-    logger.info("Iniciando setup do ambiente para o bot e servidor Flask.")
-
-    # 1. Configura o webhook uma vez ao iniciar o serviço
+# Função para ser chamada pelo Web Service na inicialização (chamada no Procfile)
+def start_web_service():
+    logger.info("Iniciando setup do Web Service (Flask e Webhook).")
     try:
         # A configuração do webhook precisa ser executada no loop de eventos principal
         # se Gunicorn/Flask não tiver um loop já rodando.
@@ -321,33 +324,43 @@ def run_bot_and_server():
         asyncio.run(set_webhook_on_startup())
         logger.info("Webhook configurado com sucesso (ou já estava configurado).")
     except RuntimeError:
-        # Se um loop já estiver rodando (ex: por outro worker do Gunicorn ou Uvicorn),
-        # agendamos a tarefa para ele.
         current_loop = asyncio.get_event_loop()
         if current_loop.is_running():
             current_loop.create_task(set_webhook_on_startup())
             logger.info("Webhook agendado para configuração no loop existente.")
         else:
-            logger.error("Não foi possível configurar o webhook na inicialização: nenhum loop de eventos disponível e um RuntimeEror ocorreu.")
-            raise # Re-lança o erro se for crítico
-
-    # 2. Inicia o loop de eventos do python-telegram-bot em uma thread separada
-    if application:
-        ptb_thread = threading.Thread(target=run_ptb_application, daemon=True)
-        ptb_thread.start()
-        logger.info("Thread do python-telegram-bot iniciada para processar updates.")
-    else:
-        logger.critical("Não foi possível iniciar a thread do python-telegram-bot pois a aplicação não foi construída.")
+            logger.error("Não foi possível configurar o webhook na inicialização: nenhum loop de eventos disponível e um RuntimeError ocorreu.")
+            raise
 
     logger.info("Servidor Flask pronto para ser iniciado pelo Gunicorn.")
 
-# Este bloco só é executado se o arquivo for rodado diretamente (para testes locais)
+# Função para ser chamada pelo Background Worker (chamada no Procfile)
+def run_ptb_worker():
+    if not TELEGRAM_BOT_TOKEN:
+        logger.critical("Não foi possível iniciar o worker do Telegram: TOKEN do bot não está disponível.")
+        return
+
+    if not application:
+        logger.critical("Não foi possível iniciar o worker do Telegram: Aplicação do Telegram não foi construída.")
+        return
+
+    if not q:
+        logger.critical("Não foi possível iniciar o worker do Telegram: Fila do Redis não está disponível.")
+        return
+
+    logger.info("Iniciando o worker RQ para processar updates do Telegram.")
+    # Este é o comando do RQ worker
+    from rq import Worker
+    worker = Worker([q], connection=redis_conn)
+    worker.work()
+
+# Este bloco só é executado se o arquivo for rodado diretamente
 if __name__ == '__main__':
     logger.info("Executando bot.py no bloco __main__ (provavelmente para teste local).")
-    # Para teste local SEM Gunicorn, você poderia usar:
-    # asyncio.run(set_webhook_on_startup())
-    # application.run_polling() # Para testar localmente via polling
-
-    # No Render, o Procfile chamará run_bot_and_server() e o Gunicorn iniciará o Flask.
-    # Portanto, não precisamos do flask_app.run() aqui.
-    pass
+    # Para teste local:
+    # 1. Certifique-se de ter Redis rodando localmente (docker run -p 6379:6379 redis)
+    # 2. Rode o worker em um terminal: python -c "from bot import run_ptb_worker; run_ptb_worker()"
+    # 3. Rode o Flask em outro terminal: flask run --port 5000 (ou com gunicorn)
+    #    E configure o webhook do Telegram para http://localhost:5000/api/telegram/webhook
+    start_web_service() # Apenas configura o webhook
+    flask_app.run(port=5000) # Para teste local do Flask
