@@ -1,8 +1,8 @@
 import logging
-import os  # Adicionado para acessar variáveis de ambiente
+import os
 from flask import Flask, request, jsonify
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler # Importe CommandHandler
 import asyncio
 import json
 
@@ -13,7 +13,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Seu TOKEN do Bot do Telegram
-# AGORA LENDO DA VARIÁVEL DE AMBIENTE DO RENDER!
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN") 
 
 # Verificação para garantir que o token foi carregado
@@ -28,9 +27,6 @@ WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook" # Seu webhook
 flask_app = Flask(__name__)
 
 # Dados do FAQ (exemplo simplificado, você carregaria do seu JSON)
-# Carregue seu FAQ de um arquivo JSON aqui. Exemplo:
-# with open('faq.json', 'r', encoding='utf-8') as f:
-#     faq_data = json.load(f)
 faq_data = [
     {
         "id": 1,
@@ -146,6 +142,7 @@ def buscar_faq(texto_usuario):
     matches = []
     texto_usuario_lower = texto_usuario.lower()
     for item in faq_data:
+        # CORREÇÃO CRÍTICA AQUI: de "palavras_chavqwe" para "palavras_chave"
         for palavra_chave in item.get("palavras_chave", []):
             if palavra_chave in texto_usuario_lower:
                 matches.append(item)
@@ -198,17 +195,15 @@ async def button_callback_handler(update: Update, context):
         logger.warning(f"Botão de FAQ pressionado com ID inválido: {faq_id}")
 
 # Setup do Application
-# Verifique se TELEGRAM_BOT_TOKEN é None antes de passá-lo para Bot
 if TELEGRAM_BOT_TOKEN:
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 else:
     logger.critical("Não foi possível iniciar o aplicativo Telegram pois o token não foi carregado.")
-    # Você pode querer adicionar um sys.exit(1) aqui se quiser que a aplicação pare de imediato
-    application = None # Define application como None para evitar erros se o token não estiver presente
-
+    application = None
 
 # Adicionar handlers (apenas se a aplicação foi construída com sucesso)
 if application:
+    application.add_handler(CommandHandler("start", start)) # Adicionado o handler para /start
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(CallbackQueryHandler(button_callback_handler))
 
@@ -222,7 +217,6 @@ def health_check():
 @flask_app.route("/api/telegram/webhook", methods=["POST"])
 async def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    # Crie a instância do bot aqui para garantir que use o token carregado
     if TELEGRAM_BOT_TOKEN:
         bot_instance = Bot(TELEGRAM_BOT_TOKEN)
         await application.update_queue.put(Update.de_json(request.get_json(force=True), bot_instance))
@@ -231,12 +225,11 @@ async def telegram_webhook():
         logger.error("Requisição de webhook recebida, mas o TOKEN do bot não está configurado.")
         return jsonify({"status": "error", "message": "Bot token not configured"}), 500
 
-
 # Função para configurar o webhook na inicialização
 async def set_webhook_on_startup():
     if not TELEGRAM_BOT_TOKEN:
         logger.error("Não é possível configurar o webhook: TOKEN do bot não está disponível.")
-        return # Sair da função se o token não estiver disponível
+        return
 
     try:
         bot_instance = Bot(TELEGRAM_BOT_TOKEN)
@@ -252,14 +245,6 @@ async def set_webhook_on_startup():
     except Exception as e:
         logger.error(f"Erro ao configurar webhook: {e}")
 
-# Este bloco não será executado quando o Uvicorn iniciar o app diretamente via Procfile
-# A função set_webhook_on_startup() será chamada via o script startup.sh
 if __name__ == '__main__':
-    # No ambiente de produção do Render, este bloco não é executado diretamente para iniciar o Flask.
-    # O Gunicorn (que você já adicionou no Procfile e requirements.txt) será responsável por isso.
-    # Esta parte é mais para testar localmente, mas não é estritamente necessária para o deploy no Render.
     logger.info("Executando bot.py no bloco __main__ (provavelmente para teste local).")
-    # Para testes locais, você precisaria de um loop de evento para o asyncio.
-    # asyncio.run(set_webhook_on_startup()) # Chama a função de webhook se executando localmente
-    # flask_app.run(port=5000) # Inicia o servidor Flask localmente
     pass
