@@ -2,5 +2,6 @@ Flask[async]>=3.1.1
 python-telegram-bot==22.2
 uvicorn==0.35.0
 gunicorn==23.0.0
-redis>=4.5.0 # Or the latest stable version
-rq>=1.15.0   # Or the latest stable version
+# Adicione/atualize a biblioteca para Redis e RQ
+redis>=4.5.0
+rq
