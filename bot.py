@@ -142,8 +142,6 @@ def buscar_faq(texto_usuario):
     matches = []
     texto_usuario_lower = texto_usuario.lower()
     for item in faq_data:
-        # CORREÇÃO CRÍTICA AQUI: de "palavras_chavqwe" para "palavras_chave"
-        # Garanta que esta linha está assim no seu bot.py
         for palavra_chave in item.get("palavras_chave", []): 
             if palavra_chave in texto_usuario_lower:
                 matches.append(item)
@@ -152,45 +150,44 @@ def buscar_faq(texto_usuario):
 
 # Handlers do Telegram Bot
 async def start(update: Update, context):
+    logger.info(f"Comando /start recebido de {update.effective_user.first_name} (ID: {update.effective_user.id})")
     await update.message.reply_text('Olá! Bem-vindo ao CHOPP Digital. Como posso te ajudar hoje?')
 
 async def handle_message(update: Update, context):
     user_text = update.message.text
-    logger.info(f"Mensagem recebida de {update.effective_user.first_name} (ID: {update.effective_user.id}): {user_text}")
+    if user_text: # Garante que há texto na mensagem antes de processar
+        logger.info(f"Mensagem recebida de {update.effective_user.first_name} (ID: {update.effective_user.id}): {user_text}")
 
-    # --- NOVOS LOGS DE DEPURACAO AQUI ---
-    logger.info(f"Buscando FAQ para o texto: '{user_text}'")
-    
-    found_faqs = buscar_faq(user_text)
-    
-    # Adicionando um log mais detalhado sobre o resultado da busca
-    if found_faqs:
-        faq_ids = [faq['id'] for faq in found_faqs]
-        logger.info(f"FAQs encontradas: IDs {faq_ids}")
+        logger.info(f"Buscando FAQ para o texto: '{user_text}'")
+        
+        found_faqs = buscar_faq(user_text)
+        
+        if found_faqs:
+            faq_ids = [faq['id'] for faq in found_faqs]
+            logger.info(f"FAQs encontradas: IDs {faq_ids}")
+            
+            if len(found_faqs) == 1:
+                faq_item = found_faqs[0]
+                await update.message.reply_text(faq_item["resposta"], parse_mode='Markdown')
+                logger.info(f"FAQ encontrada e enviada: ID {faq_item['id']}")
+            else:
+                keyboard = []
+                for faq_item in found_faqs:
+                    keyboard.append([InlineKeyboardButton(faq_item["pergunta"], callback_data=str(faq_item["id"]))])
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text('Encontrei algumas opções. Qual delas você gostaria de saber?', reply_markup=reply_markup)
+                logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[faq['pergunta'] for faq in found_faqs]}")
+        else:
+            fallback_faq = next((item for item in faq_data if item["id"] == 54), None)
+            if fallback_faq:
+                await update.message.reply_text(fallback_faq["resposta"], parse_mode='Markdown')
+                logger.info("Nenhuma FAQ encontrada. Enviando resposta de fallback (ID 54).")
+            else:
+                await update.message.reply_text("Desculpe, não consegui encontrar uma resposta para sua pergunta. Por favor, tente reformular ou entre em contato diretamente.")
+                logger.info("Nenhuma FAQ encontrada e fallback (ID 54) não configurado.")
     else:
-        logger.info("Nenhuma FAQ encontrada para o texto.")
-    # --- FIM DOS NOVOS LOGS DE DEPURACAO ---
+        logger.warning(f"Mensagem recebida sem texto de {update.effective_user.first_name} (ID: {update.effective_user.id}). Ignorando.")
 
-    if found_faqs:
-        if len(found_faqs) == 1:
-            faq_item = found_faqs[0]
-            await update.message.reply_text(faq_item["resposta"], parse_mode='Markdown')
-            logger.info(f"FAQ encontrada e enviada: ID {faq_item['id']}")
-        else:
-            keyboard = []
-            for faq_item in found_faqs:
-                keyboard.append([InlineKeyboardButton(faq_item["pergunta"], callback_data=str(faq_item["id"]))])
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text('Encontrei algumas opções. Qual delas você gostaria de saber?', reply_markup=reply_markup)
-            logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[faq['pergunta'] for faq in found_faqs]}")
-    else:
-        fallback_faq = next((item for item in faq_data if item["id"] == 54), None)
-        if fallback_faq:
-            await update.message.reply_text(fallback_faq["resposta"], parse_mode='Markdown')
-            logger.info("Nenhuma FAQ encontrada. Enviando resposta de fallback (ID 54).")
-        else:
-            await update.message.reply_text("Desculpe, não consegui encontrar uma resposta para sua pergunta. Por favor, tente reformular ou entre em contato diretamente.")
-            logger.info("Nenhuma FAQ encontrada e fallback (ID 54) não configurado.")
 
 async def button_callback_handler(update: Update, context):
     query = update.callback_query
@@ -229,19 +226,29 @@ def health_check():
 @flask_app.route("/api/telegram/webhook", methods=["POST"])
 async def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    if TELEGRAM_BOT_TOKEN:
+    if TELEGRAM_BOT_TOKEN and application: # Garante que a aplicação foi construída
         try:
             bot_instance = Bot(TELEGRAM_BOT_TOKEN)
             update_data = request.get_json(force=True)
-            logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}") # Log da atualização bruta formatada
+            logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}") 
+            
+            # --- NOVO PONTO DE DEPURACAO CRITICO AQUI ---
+            logger.info("Tentando colocar a atualização na fila da aplicação do Telegram.")
             await application.update_queue.put(Update.de_json(update_data, bot_instance))
+            logger.info("Atualização colocada na fila com sucesso.")
+            # --- FIM DO NOVO PONTO DE DEPURACAO ---
+
             return jsonify({"status": "ok"}), 200
         except Exception as e:
-            logger.error(f"Erro ao processar atualização do webhook: {e}")
+            logger.error(f"Erro ao processar atualização do webhook ou colocar na fila: {e}", exc_info=True) # exc_info=True para stack trace
             return jsonify({"status": "error", "message": str(e)}), 500
     else:
-        logger.error("Requisição de webhook recebida, mas o TOKEN do bot não está configurado.")
-        return jsonify({"status": "error", "message": "Bot token not configured"}), 500
+        if not TELEGRAM_BOT_TOKEN:
+            logger.error("Requisição de webhook recebida, mas o TOKEN do bot não está configurado.")
+            return jsonify({"status": "error", "message": "Bot token not configured"}), 500
+        else: # application é None
+            logger.error("Requisição de webhook recebida, mas a aplicação do Telegram não foi inicializada corretamente.")
+            return jsonify({"status": "error", "message": "Telegram Application not initialized"}), 500
 
 # Função para configurar o webhook na inicialização
 async def set_webhook_on_startup():
@@ -261,8 +268,11 @@ async def set_webhook_on_startup():
         else:
             logger.info("Webhook já está configurado corretamente.")
     except Exception as e:
-        logger.error(f"Erro ao configurar webhook: {e}")
+        logger.error(f"Erro ao configurar webhook: {e}", exc_info=True) # exc_info=True para stack trace
 
 if __name__ == '__main__':
     logger.info("Executando bot.py no bloco __main__ (provavelmente para teste local).")
+    # Para testes locais ou para garantir que o webhook é configurado se o script for executado diretamente
+    # asyncio.run(set_webhook_on_startup()) 
+    # flask_app.run(debug=True, port=5000) # Remover para produção no Render
     pass
