@@ -2,7 +2,6 @@ import logging
 import os
 import asyncio
 import json
-import threading
 from flask import Flask, request, jsonify
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
@@ -33,385 +32,291 @@ if not TELEGRAM_BOT_TOKEN:
     # raise ValueError("BOT_TOKEN não configurado. Impossível prosseguir.")
 
 # Construção da URL do Webhook
-RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
-if RENDER_EXTERNAL_HOSTNAME:
-    WEBHOOK_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}/api/telegram/webhook"
-else:
-    # Fallback para desenvolvimento local. Certifique-se de que esta URL seja acessível externamente se for para produção.
-    # Para testes locais, esta URL precisa corresponder onde seu Flask estará rodando.
-    WEBHOOK_URL = "http://localhost:5000/api/telegram/webhook"
-    logger.warning(f"RENDER_EXTERNAL_HOSTNAME não encontrado. Usando fallback WEBHOOK_URL para desenvolvimento local: {WEBHOOK_URL}")
+RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME')
+WEBHOOK_URL = f"https://{RENDER_EXTERNAL_HOSTNAME}/api/telegram/webhook" if RENDER_EXTERNAL_HOSTNAME else None
 
-# --- Conexão ao Redis e Configuração da Fila RQ ---
-redis_conn = None
-q = None
+
+# --- Conexão Redis ---
 try:
-    # ATENÇÃO: As linhas abaixo foram indentadas com 4 espaços.
-    redis_conn = redis.from_url(REDIS_URL, ssl_cert_reqs=None)
-
-    # Teste de conexão simples
-    redis_conn.ping()
-    q = Queue(connection=redis_conn)
-    logger.info(f"Conectado ao Redis em: {REDIS_URL}")
-except RedisConnectionError as e: # Captura o erro específico de conexão do Redis
-    logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. Verifique a URL e a disponibilidade do serviço Redis. Worker não poderá iniciar: {e}", exc_info=True)
-    # `q` permanecerá None, e as rotas/funções verificarão isso.
+    # A adição de ssl_cert_reqs=None é crucial para resolver o erro SSL: WRONG_VERSION_NUMBER
+    # em alguns ambientes de nuvem como o Redis Cloud usado pelo Render.
+    redis_conn = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
+    redis_conn.ping()  # Test connection
+    logger.info("Conexão com Redis estabelecida com sucesso.")
+except RedisConnectionError as e:
+    logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. Verifique a URL e a disponibilidade do serviço Redis. Worker não poderá iniciar: {e}")
+    # Se o Redis for essencial para o worker, o worker pode não funcionar corretamente sem ele.
+    # Em um ambiente real, você pode querer que o processo do worker saia aqui.
+    # import sys; sys.exit(1)
 except Exception as e:
-    logger.critical(f"ERRO DESCONHECIDO ao conectar ao Redis: {e}", exc_info=True)
+    logger.critical(f"ERRO DESCONHECIDO ao conectar ou usar Redis: {e}")
+    # import sys; sys.exit(1)
+
+# Inicializa a fila do RQ (se a conexão Redis for bem-sucedida)
+if 'redis_conn' in locals() and redis_conn: # Verifica se redis_conn foi criada
+    queue = Queue(connection=redis_conn)
+else:
+    # Caso a conexão Redis falhe, a fila não será inicializada.
+    # Isso será tratado nos handlers que tentam enfileirar jobs.
+    queue = None
+    logger.error("Fila RQ não inicializada devido a falha na conexão Redis.")
+
+# --- Carregamento da Base de Conhecimento (FAQ) ---
+# O arquivo faq_data.json deve estar na mesma pasta ou em uma pasta acessível.
+# Certifique-se de que o caminho esteja correto para o seu deploy.
+try:
+    with open('faq_data.json', 'r', encoding='utf-8') as f:
+        faq_data_raw = json.load(f)
+    # Converte o dicionário de FAQs para uma lista de dicionários para facilitar a busca
+    faq_data = list(faq_data_raw.values())
+    logger.info(f"FAQ carregado com sucesso. Total de {len(faq_data)} itens.")
+except FileNotFoundError:
+    logger.critical("ERRO CRÍTICO: O arquivo 'faq_data.json' não foi encontrado. Certifique-se de que ele está no diretório correto.")
+    faq_data = [] # Inicializa vazio para evitar erros posteriores
+except json.JSONDecodeError:
+    logger.critical("ERRO CRÍTICO: Erro ao decodificar 'faq_data.json'. Verifique a sintaxe JSON do arquivo.")
+    faq_data = [] # Inicializa vazio
+except Exception as e:
+    logger.critical(f"ERRO CRÍTICO: Erro inesperado ao carregar FAQ: {e}")
+    faq_data = [] # Inicializa vazio
+
+# --- Funções de Ajuda do Bot ---
+
+def find_faqs_by_keywords(text):
+    """
+    Encontra FAQs que contenham as palavras-chave no texto do usuário.
+    Retorna uma lista de dicionários FAQ correspondentes.
+    """
+    text_lower = text.lower()
+    matched_faqs = []
+    for faq_item in faq_data:
+        # Verifica se alguma das palavras-chave do FAQ está no texto do usuário
+        if any(keyword.lower() in text_lower for keyword in faq_item.get('palavras_chave', [])):
+            matched_faqs.append(faq_item)
+    return matched_faqs
+
+def generate_faq_response(matched_faqs):
+    """
+    Gera a resposta baseada nas FAQs encontradas.
+    Se uma FAQ for encontrada, retorna a resposta.
+    Se múltiplas forem encontradas, cria botões para cada uma.
+    """
+    if not matched_faqs:
+        return "Desculpe, não consegui encontrar uma resposta para isso no momento. Poderia reformular sua pergunta ou tentar algo diferente? Se precisar de atendimento humano, digite 'humano'."
+    elif len(matched_faqs) == 1:
+        return matched_faqs[0]['resposta']
+    else:
+        # Múltiplas FAQs encontradas, oferece opções ao usuário
+        keyboard_buttons = []
+        for faq_item in matched_faqs:
+            # Garante que o callback_data não exceda o limite de 64 bytes
+            # Usamos o ID do FAQ como callback_data
+            callback_data = f"faq_{faq_item['id']}"
+            keyboard_buttons.append([InlineKeyboardButton(faq_item['pergunta'], callback_data=callback_data)])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard_buttons)
+        return "Encontrei algumas opções. Qual delas você gostaria de saber mais?", reply_markup
+
+# --- Handlers do Bot (executados pelo RQ Worker) ---
+
+async def handle_message_job(update_json):
+    """
+    Função a ser executada pelo RQ worker para processar mensagens.
+    Recebe o update em formato JSON e o reconstrói.
+    """
+    update = Update.de_json(update_json, bot=Bot(token=TELEGRAM_BOT_TOKEN))
+    chat_id = update.effective_chat.id
+    user_message = update.message.text
+    logger.info(f"Processando mensagem de {chat_id}: '{user_message}'")
+
+    matched_faqs = find_faqs_by_keywords(user_message)
+    response_text, reply_markup = generate_faq_response(matched_faqs) if matched_faqs else (
+        "Desculpe, não consegui encontrar uma resposta para isso no momento. Poderia reformular sua pergunta ou tentar algo diferente? Se precisar de atendimento humano, digite 'humano'.", None
+    )
+
+    if reply_markup:
+        await update.message.reply_text(response_text, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(response_text)
+    logger.info(f"Update ID: {update.update_id} processado com sucesso.")
 
 
-# --- Instância do Flask ---
+async def button_callback_job(update_json):
+    """
+    Função a ser executada pelo RQ worker para processar callbacks de botões.
+    """
+    update = Update.de_json(update_json, bot=Bot(token=TELEGRAM_BOT_TOKEN))
+    query = update.callback_query
+    chat_id = query.message.chat_id
+    callback_data = query.data
+    logger.info(f"Processando callback de botão de {chat_id}: '{callback_data}'")
+
+    await query.answer() # Avisa o Telegram que a query foi recebida para remover o "loading" no botão
+
+    if callback_data.startswith("faq_"):
+        try:
+            faq_id = int(callback_data.split("_")[1])
+            faq_item = next((item for item in faq_data if item['id'] == faq_id), None)
+            if faq_item:
+                await query.edit_message_text(text=faq_item['resposta'])
+                logger.info(f"Resposta FAQ {faq_id} enviada para {chat_id}.")
+            else:
+                await query.edit_message_text(text="FAQ não encontrada.")
+                logger.warning(f"FAQ com ID {faq_id} não encontrada para callback.")
+        except (IndexError, ValueError):
+            await query.edit_message_text(text="Dados do botão inválidos.")
+            logger.error(f"Erro ao processar callback_data inválido: {callback_data}")
+    else:
+        await query.edit_message_text(text="Ação desconhecida do botão.")
+        logger.warning(f"Callback data desconhecido: {callback_data}")
+    logger.info(f"Update ID: {update.update_id} (callback) processado com sucesso.")
+
+
+# --- Aplicação Flask (Web Service) ---
 flask_app = Flask(__name__)
 
-# --- Dados do FAQ (mantido como está) ---
-faq_data = [
-    {
-        "id": 1,
-        "pergunta": "Mensagem de boas-vindas",
-        "resposta": "Bem-vindo ao nosso serviço!",
-        "palavras_chave": ["boas-vindas", "oi", "olá", "começar"]
-    },
-    {
-        "id": 2,
-        "pergunta": "Como saber quantos litros de chope preciso para o meu evento?",
-        "resposta": "Para estimar a quantidade de chopp, considere 1,5 a 2 litros por pessoa para eventos de 4 horas.",
-        "palavras_chave": ["litros", "quantidade", "evento", "chope", "cerveja"]
-    },
-    {
-        "id": 3,
-        "pergunta": "Qual é o horário de atendimento de vocês?",
-        "resposta": "Nosso horário de atendimento é de segunda a sexta, das 9h às 18h.",
-        "palavras_chave": ["horário", "atendimento", "abertura", "funciona"]
-    },
-    {
-        "id": 53,
-        "pergunta": "Como funciona a coleta/recolha do equipamento (chopeira, barril)?",
-        "resposta": (
-            "⚠️ AVISO INFORMATIVO — RECOLHA DO MATERIAL COMODATADO\n\n"
-            "Este informativo orienta a coleta dos materiais (chopeira, barril, etc.) de acordo com a rota estabelecida durante o horário comercial.\n\n"
-            "**CRITÉRIO:**\n"
-            "As coletas seguem uma rota definida pela empresa para atender o maior número de clientes por região, podendo ser alterada semanalmente conforme a demanda.\n\n"
-            "**HORÁRIO DE COLETA | ROTA:**\n"
-            "Não realizamos coleta agendada. As coletas ocorrem por período:\n"
-            "🕘 Manhã / Tarde\n"
-            "📆 Segunda à Terça-feira — das 9h às 18h\n\n"
-            "**REGIME DE EXCEÇÃO (ALTA DEMANDA):**\n"
-            "Conforme critério da empresa, a coleta pode se estender para:\n"
-            "📆 Quarta-feira — das 9h às 18h\n\n"
-            "🚫 Não fazemos desvios de rota para atendimento personalizado.\n\n"
-            "**COMUNICAÇÃO COM O CLIENTE:**\n"
-            "- A empresa fará contato durante a rota para garantir a presença de um responsável.\n"
-            "- Em caso de insucesso no contato, a rota será reavaliada e reprogramada até quarta-feira.\n"
-            "- Se houver imprevistos, o cliente deve entrar em contato com a loja para entender a rota.\n"
-            "- Caso a rota não atenda à necessidade, o cliente deve providenciar um substituto para liberar o material.\n\n"
-            "**MULTA:**\n"
-            "A partir de quinta-feira será cobrada taxa diária de R$100,00/dia pela não disponibilidade de recolha.\n\n"
-            "**IMPORTANT!**\n"
-            "- Todos os materiais devem estar prontos e em perfeita condição para recolha.\n"
-            "- É necessário que haja um responsável no local para liberar o acesso.\n"
-            "- A guarda dos materiais é responsabilidade do cliente, sujeito a cobrança em caso de perda ou dano.\n"
-            "- Serão feitas fotos e filmagem dos materiais para respaldo.\n\n"
-            "📦 Agradecemos a colaboração! Equipe de Logística — Chopp Brahma"
-        ),
-        "palavras_chave": [
-            "coleta", "recolha", "recolhimento", "buscar", "retirada", "devolução",
-            "horário coleta", "quando buscam", "rota coleta", "agendar coleta",
-            "multa", "taxa", "material", "equipamento", "chopeira", "barril",
-            "comodatado", "logística reversa", "responsabilidade", "aviso"
-        ]
-    },
-    {
-        "id": 54,
-        "pergunta": "Não encontrei minha dúvida. Como posso ser atendido?",
-        "resposta": (
-            "Sentimos muito que você não tenha encontrado a resposta para sua dúvida em nosso FAQ. 😔\n\n"
-            "Para um atendimento mais personalizado, por favor, clique no link abaixo para falar diretamente com nossa equipe via WhatsApp:\n\n"
-            "📱 [**Clique aqui para falar conosco no WhatsApp!**](https://wa.me/556139717502) \n\n"
-            "Ou, se preferir, você pode nos ligar no **(61) 3971-7502**.\n\n"
-            "Estamos prontos para te ajudar!"
-        ),
-        "palavras_chave": [
-            "não encontrei", "minha dúvida", "não achei", "falar com atendente", "contato",
-            "suporte", "ajuda", "whatsapp", "fale conosco", "atendimento", "outro assunto",
-            "telefone", "não consegui a resposta", "qual o numero", "falar com consultor",
-            "não é isso que procuro", "preciso de mais ajuda", "não resolveu", "ainda tenho dúvidas",
-            "falar com alguém", "atendimento humano", "chat", "direcionar", "onde ligo"
-        ]
-    },
-    {
-        "id": 55,
-        "pergunta": "Quais dados preciso informar para fazer um cadastro ou pedido?",
-        "resposta": (
-            "Para que possamos processar seu pedido e emitir a Ordem de Serviço e Nota Fiscal, precisamos dos seguintes dados. Por favor, preencha-os com atenção:\n\n"
-            "--- --- ---\n\n"
-            "**DADOS DO EVENTO:**\n"
-            "📅 *Data do evento:*\n"
-            "⏰ *Horário do evento:*\n"
-            "🗺️ *Endereço do evento:*\n"
-            "✉️ *CEP do evento:*\n"
-            "🗓️ *Data da entrega (do equipamento/chopp):*\n\n"
-            "**DADOS PESSOAIS / EMPRESARIAIS:**\n"
-            "📧 *E-mail:*\n"
-            "👤 *Nome completo / Razão Social:*\n"
-            "🏢 *Nome Fantasia (para CNPJ, se aplicável):*\n"
-            "📞 *Telefone:*\n"
-            "🆔 *CPF / CNPJ:*\n"
-            "💳 *RG / Órgão Emissor (para CPF, se aplicável):*\n"
-            "📝 *Inscrição Estadual (para CNPJ, se aplicável):*\n"
-            "🏡 *Endereço da sua residência:*\n"
-            "📮 *CEP da residência:*\n\n"
-            "**DETALHES DO PEDIDO:**\n"
-            "🍺 *Quantidade de Litros de Chopp:*\n"
-            "💰 *Forma de Pagamento (Pix ou Cartão):*\n\n"
-            "--- --- ---\n\n"
-            "Agradecemos a sua colaboração! Assim que tivermos essas informações, agilizaremos seu pedido."
-        ),
-        "palavras_chave": [
-            "cadastro", "pedido", "dados", "informar dados", "documentos", "o que preciso",
-            "requisitos", "fazer pedido", "cadastro de cliente", "solicitar pedido",
-            "informações para pedido", "lista de dados", "pedir chopp", "como pedir"
-        ]
-    }
-]
+# Cria uma instância da aplicação do Telegram Bot para definir o webhook
+application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-# --- Funções de Lógica do Bot (Assíncronas) ---
-def buscar_faq(texto_usuario):
-    matches = []
-    texto_usuario_lower = texto_usuario.lower()
-    for item in faq_data:
-        # Verifica se alguma palavra-chave está contida no texto do usuário
-        if any(palavra_chave in texto_usuario_lower for palavra_chave in item.get("palavras_chave", [])):
-            matches.append(item)
-    return matches
+@flask_app.route('/api/telegram/webhook', methods=['POST'])
+async def telegram_webhook():
+    """
+    Endpoint para o webhook do Telegram.
+    Recebe as atualizações do Telegram e as enfileira para processamento.
+    """
+    if not request.json:
+        logger.warning("Webhook endpoint hit com requisição vazia.")
+        return jsonify({'status': 'no content'}), 200
 
-async def start(update: Update, context):
-    logger.info(f"Comando /start recebido de {update.effective_user.first_name} (ID: {update.effective_user.id})")
-    try:
-        await update.message.reply_text('Olá! Bem-vindo ao CHOPP Digital. Como posso te ajudar hoje?')
-        logger.info(f"Resposta enviada para /start para {update.effective_user.id}")
-    except Exception as e:
-        logger.error(f"Erro ao responder ao comando /start para {update.effective_user.id}: {e}", exc_info=True)
-
-async def handle_message(update: Update, context):
-    user_text = update.message.text
-    if user_text:
-        logger.info(f"Mensagem recebida de {update.effective_user.first_name} (ID: {update.effective_user.id}): {user_text}")
-        logger.info(f"Buscando FAQ para o texto: '{user_text}'")
-
-        try:
-            found_faqs = buscar_faq(user_text)
-
-            if found_faqs:
-                faq_ids = [faq['id'] for faq in found_faqs]
-                logger.info(f"FAQs encontradas: IDs {faq_ids}")
-
-                if len(found_faqs) == 1:
-                    faq_item = found_faqs[0]
-                    await update.message.reply_text(faq_item["resposta"], parse_mode='Markdown')
-                    logger.info(f"FAQ encontrada e enviada: ID {faq_item['id']} para {update.effective_user.id}")
-                else:
-                    keyboard = []
-                    for faq_item in found_faqs:
-                        keyboard.append([InlineKeyboardButton(faq_item["pergunta"], callback_data=str(faq_item["id"]))])
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    await update.message.reply_text('Encontrei algumas opções. Qual delas você gostaria de saber?', reply_markup=reply_markup)
-                    logger.info(f"Múltiplas FAQs encontradas. Oferecendo botões para: {[faq['pergunta'] for faq in found_faqs]} para {update.effective_user.id}")
-            else:
-                # Fallback para a FAQ de "Não encontrei minha dúvida" (ID 54)
-                fallback_faq = next((item for item in faq_data if item["id"] == 54), None)
-                if fallback_faq:
-                    await update.message.reply_text(fallback_faq["resposta"], parse_mode='Markdown')
-                    logger.info(f"Nenhuma FAQ encontrada. Enviando resposta de fallback (ID 54) para {update.effective_user.id}.")
-                else:
-                    await update.message.reply_text("Desculpe, não consegui encontrar uma resposta para sua pergunta. Por favor, tente reformular ou entre em contato diretamente.")
-                    logger.info(f"Nenhuma FAQ encontrada e fallback (ID 54) não configurado para {update.effective_user.id}.")
-        except Exception as e:
-            logger.error(f"Erro ao processar mensagem ou enviar resposta para {update.effective_user.id}: {e}", exc_info=True)
-    else:
-        logger.warning(f"Mensagem recebida sem texto de {update.effective_user.first_name} (ID: {update.effective_user.id}). Ignorando.")
-
-async def button_callback_handler(update: Update, context):
-    query = update.callback_query
-    await query.answer()  # Sempre responda ao callback_query
-
-    faq_id = int(query.data)
-    faq_item = next((item for item in faq_data if item["id"] == faq_id), None)
-
-    try:
-        if faq_item:
-            # Usar edit_message_text para evitar enviar uma nova mensagem
-            await query.edit_message_text(faq_item["resposta"], parse_mode='Markdown')
-            logger.info(f"Botão de FAQ pressionado e resposta editada por {query.from_user.first_name}: ID {faq_id}")
-        else:
-            await query.edit_message_text("Desculpe, não consegui encontrar a resposta para esta opção.", parse_mode='Markdown')
-            logger.warning(f"Botão de FAQ pressionado com ID inválido: {faq_id} por {query.from_user.first_name}")
-    except Exception as e:
-        logger.error(f"Erro ao processar callback de botão ou editar mensagem para {query.from_user.id}: {e}", exc_info=True)
-
-# --- Setup do Application (global para o worker) ---
-application = None
-if TELEGRAM_BOT_TOKEN:
-    # Use ApplicationBuilder para uma construção mais explícita
-    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(button_callback_handler))
-    logger.info("Application do Telegram Bot construída e handlers adicionados.")
-else:
-    logger.critical("Não foi possível construir o aplicativo Telegram pois o token não foi carregado.")
-
-# --- Funções de Processamento de Atualizações (RQ Worker) ---
-# Esta função será enfileirada e executada pelo worker
-async def process_telegram_update(update_json: dict):
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("Não é possível processar a atualização: TOKEN do bot não está disponível.")
-        return
-
-    if not application:
-        logger.critical("A aplicação do Telegram não foi inicializada. Impossível processar updates.")
-        return
-
-    try:
-        # A instância do bot é necessária para o Update.de_json
-        # É crucial que o bot_instance aqui seja criado dentro do contexto do worker
-        # pois o Update.de_json precisa de um objeto Bot válido para operar.
-        bot_instance = Bot(TELEGRAM_BOT_TOKEN)
-        update = Update.de_json(update_json, bot_instance)
-        logger.info(f"Processando update ID: {update.update_id} na fila do RQ.")
-        await application.process_update(update)
-        logger.info(f"Update ID: {update.update_id} processado com sucesso.")
-    except Exception as e:
-        logger.error(f"Erro ao processar update {update_json.get('update_id', 'N/A')} na fila: {e}", exc_info=True)
-
-
-# --- Rotas do Flask (Web Service) ---
-@flask_app.route("/health", methods=["GET"])
-def health_check():
-    logger.info("Rota /health acessada.")
-    # Adicionar uma verificação de saúde do Redis também
-    if redis_conn: # Certifica-se de que a conexão não é None
-        try:
-            redis_conn.ping()
-            logger.info("Health check: Conexão Redis OK.")
-            return "OK - Redis Connected", 200
-        except RedisConnectionError as e:
-            logger.error(f"Health check falhou: Redis ConnectionError - {e}", exc_info=True)
-            return "ERROR - Redis Disconnected", 500
-    else:
-        logger.error("Health check falhou: Objeto de conexão Redis é None. Possivelmente falha na inicialização.")
-        return "ERROR - Redis Connection Not Initialized", 500
-
-@flask_app.route("/api/telegram/webhook", methods=["POST"])
-def telegram_webhook():
     logger.info("Webhook endpoint hit! (Recebendo requisição do Telegram)")
-    if not q: # Verifica se a fila foi inicializada com sucesso
+    update = Update.de_json(request.json, application.bot)
+
+    if not queue:
         logger.error("Requisição de webhook recebida, mas a fila do Redis não está disponível. Retornando 503.")
-        return jsonify({"status": "error", "message": "Redis Queue not initialized"}), 503 # 503 Service Unavailable
+        return jsonify({'status': 'Fila de processamento indisponível'}), 503
 
     try:
-        update_data = request.get_json(force=True)
-        # Logar apenas o update_id ou uma parte para evitar logs muito grandes
-        logger.info(f"Dados da atualização recebidos (ID: {update_data.get('update_id', 'N/A')}). Enfileirando...")
+        # Enfileira a atualização para ser processada pelo worker RQ
+        if update.message:
+            job = queue.enqueue(handle_message_job, update.to_dict(), job_timeout=300)
+        elif update.callback_query:
+            job = queue.enqueue(button_callback_job, update.to_dict(), job_timeout=300)
+        else:
+            logger.info(f"Tipo de atualização não tratado: {update.update_id}. Ignorando.")
+            return jsonify({'status': 'Update type not handled'}), 200
 
-        # Enfileira a atualização para ser processada pelo worker
-        # job_timeout deve ser adequado para o tempo máximo que um handler pode levar
-        job = q.enqueue(process_telegram_update, update_data, job_timeout='5m')
         logger.info(f"Atualização enfileirada para o RQ. Job ID: {job.id}")
-
-        return jsonify({"status": "ok", "job_id": job.id}), 200
+        return jsonify({'status': 'ok', 'job_id': job.id}), 200
     except Exception as e:
-        logger.error(f"Erro ao enfileirar atualização do webhook: {e}", exc_info=True)
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logger.error(f"Erro ao enfileirar atualização para o RQ: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# --- Funções de Inicialização (para Procfile) ---
 
-async def set_telegram_webhook_async():
-    """Função assíncrona para configurar o webhook do Telegram."""
+@flask_app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Endpoint de health check para o Render.
+    Verifica a conexão com o Redis e o bot.
+    """
+    try:
+        if redis_conn and redis_conn.ping():
+            redis_status = "OK"
+        else:
+            redis_status = "ERROR: Redis connection failed or ping failed."
+    except Exception as e:
+        redis_status = f"ERROR: Redis exception: {e}"
+
     if not TELEGRAM_BOT_TOKEN:
-        logger.error("Não é possível configurar o webhook: TOKEN do bot não está disponível.")
+        bot_token_status = "ERROR: BOT_TOKEN not set."
+    else:
+        bot_token_status = "OK"
+
+    status = {
+        "status": "Healthy",
+        "redis_connection": redis_status,
+        "telegram_bot_token": bot_token_status,
+        "queue_initialized": queue is not None
+    }
+
+    if "ERROR" in redis_status or "ERROR" in bot_token_status or not status["queue_initialized"]:
+        status["status"] = "Degraded"
+        return jsonify(status), 500
+    return jsonify(status), 200
+
+
+# --- Funções de Startup para o Render (chamadas pelo startup.sh ou Procfile) ---
+
+async def set_webhook_on_startup():
+    """
+    Define o webhook do Telegram. Esta função deve ser chamada na inicialização do serviço web.
+    """
+    if not WEBHOOK_URL:
+        logger.critical("ERRO CRÍTICO: RENDER_EXTERNAL_HOSTNAME não configurado. Não é possível definir o webhook.")
         return
 
-    # Usamos o Bot diretamente para simplificar o ciclo de vida e evitar conflitos de Application
-    bot_instance = Bot(TELEGRAM_BOT_TOKEN)
-
-    try:
-        webhook_info = await bot_instance.get_webhook_info()
-        current_webhook_url = webhook_info.url
-
-        if current_webhook_url != WEBHOOK_URL:
-            logger.info(f"URL do webhook atual ({current_webhook_url}) é diferente da desejada ({WEBHOOK_URL}). Configurando...")
-            await bot_instance.set_webhook(url=WEBHOOK_URL)
-            logger.info(f"Webhook definido para: {WEBHOOK_URL}")
-        else:
-            logger.info("Webhook já está configurado corretamente. Nenhuma ação necessária.")
-    except Exception as e:
-        logger.error(f"Erro ao configurar webhook: {e}", exc_info=True)
-
-def start_web_service():
-    """
-    Inicia o servidor Flask (via Gunicorn) e configura o webhook.
-    Esta função é chamada pelo Procfile 'web:'.
-    """
     logger.info("Iniciando setup do Web Service (Configuração de Webhook e Flask).")
     try:
-        # Executa a função assíncrona de configuração do webhook em seu próprio loop de eventos.
-        # Isso é executado ANTES do Gunicorn carregar e rodar a aplicação Flask.
-        asyncio.run(set_telegram_webhook_async())
+        # Verifica se o webhook já está configurado corretamente
+        current_webhook_info = await application.bot.get_webhook_info()
+        if current_webhook_info.url == WEBHOOK_URL:
+            logger.info("Webhook já está configurado corretamente. Nenhuma ação necessária.")
+        else:
+            # Define o webhook
+            await application.bot.set_webhook(url=WEBHOOK_URL)
+            logger.info(f"Webhook definido para: {WEBHOOK_URL}")
         logger.info("Configuração de webhook do Telegram concluída ou verificada com sucesso.")
     except Exception as e:
-        logger.critical(f"ERRO CRÍTICO: Falha ao configurar o webhook na inicialização. Isso pode impedir o bot de receber mensagens: {e}", exc_info=True)
+        logger.critical(f"ERRO CRÍTICO ao definir o webhook do Telegram: {e}")
 
     logger.info("Servidor Flask pronto para ser iniciado pelo Gunicorn.")
-    # flask_app.run() NÃO deve ser chamado aqui, pois o Gunicorn (do Procfile) fará isso.
 
 
 def run_ptb_worker():
     """
-    Inicia o worker RQ para processar as mensagens do Telegram.
-    Esta função é chamada pelo Procfile 'worker:'.
+    Função para iniciar o RQ Worker que processa as atualizações do Telegram.
+    Esta função deve ser chamada no serviço 'worker' do Procfile.
     """
-    if not TELEGRAM_BOT_TOKEN:
-        logger.critical("Não foi possível iniciar o worker do Telegram: TOKEN do bot não está disponível.")
+    if not queue:
+        logger.critical("RQ Worker não pode iniciar porque a fila não foi inicializada. Verifique a conexão Redis.")
         return
 
-    if not application:
-        logger.critical("Não foi possível iniciar o worker do Telegram: Aplicação do Telegram não foi construída (possívelmente TOKEN ausente).")
-        return
+    logger.info("Iniciando RQ Worker para processar a fila do Telegram...")
+    # O worker escuta na fila padrão 'default'
+    worker = Worker([queue], connection=redis_conn)
+    worker.work() # Isso inicia o loop de processamento do worker
 
-    if not q:
-        logger.critical("Não foi possível iniciar o worker do Telegram: Fila do Redis não está disponível. Worker não pode iniciar.")
-        return
+# --- Ponto de Entrada para Execução Local ou Render ---
 
-    logger.info("Iniciando o worker RQ para processar updates do Telegram.")
-    try:
-        # O Worker precisa da conexão Redis que foi estabelecida globalmente.
-        worker = Worker([q], connection=redis_conn)
-        worker.work() # Isso inicia o loop do worker e bloqueia este processo
-    except Exception as e:
-        logger.critical(f"ERRO CRÍTICO no worker RQ: {e}", exc_info=True)
-
-
-# --- Bloco de Execução Principal (para testes locais e entendimento do fluxo) ---
 if __name__ == '__main__':
-    logger.info("Executando bot.py no bloco __main__ (provavelmente para teste local).")
-    # Para teste local:
-    # 1. Certifique-se de ter um servidor Redis rodando localmente (ex: `docker run -p 6379:6379 redis`)
-    # 2. Em um terminal, inicie o worker RQ:
-    #    python -c "from bot import run_ptb_worker; run_ptb_worker()"
-    # 3. Em *outro* terminal, inicie o servidor Flask (para o webhook):
-    #    python -c "from bot import flask_app, start_web_service; start_web_service(); flask_app.run(host='0.0.0.0', port=5000, debug=True)"
-    #    - `start_web_service()` configurará o webhook.
-    #    - `flask_app.run()` iniciará o servidor web para receber os webhooks.
-    # 4. **Importante para testes locais:** Você precisará de uma forma de expor seu `localhost:5000` para a internet
-    #    (ex: ngrok, localtunnel) e configurar essa URL gerada como o webhook no BotFather do Telegram.
+    # Este bloco é principalmente para testes e desenvolvimento local.
+    # No ambiente Render, o Procfile.txt irá chamar as funções
+    # 'set_webhook_on_startup' e 'run_ptb_worker' separadamente.
 
-    logger.info("No ambiente Render, o Procfile irá chamar as funções `start_web_service` e `run_ptb_worker` separadamente.")
+    logger.info("Executando em ambiente local (modo __main__).")
+    logger.info("Para deploy no Render, use o Procfile e startup.sh.")
+
+    # Exemplo de como rodaria no startup.sh para configurar o webhook
+    asyncio.run(set_webhook_on_startup())
+
+    # Para rodar o Flask server localmente (para receber webhooks)
+    # Você precisaria de ngrok ou similar para expor este endpoint à internet.
+    # flask_app.run(host='0.0.0.0', port=5000)
+
+    # Para rodar o RQ worker localmente
+    # run_ptb_worker()
+
+    logger.info("Para testes locais completos, você precisará:")
+    logger.info("1. Ter um servidor Redis rodando localmente (ex: `docker run -p 6379:6379 redis`)")
+    logger.info("2. Em um terminal, inicie o worker RQ:")
+    logger.info("   python -c \"from bot import run_ptb_worker; run_ptb_worker()\"")
+    logger.info("3. Em *outro* terminal, inicie o servidor Flask (para o webhook):")
+    logger.info("   python -c \"from bot import flask_app, set_webhook_on_startup; asyncio.run(set_webhook_on_startup()); flask_app.run(host='0.0.0.0', port=5000, debug=True)\"")
+    logger.info("   - `set_webhook_on_startup()` configurará o webhook.")
+    logger.info("   - `flask_app.run()` iniciará o servidor web para receber os webhooks.")
+    logger.info("4. **Importante para testes locais:** Você precisará de uma forma de expor seu `localhost:5000` para a internet")
+    logger.info("   (ex: ngrok, localtunnel) e configurar essa URL gerada como o webhook no BotFather do Telegram.")
+
+    logger.info("No ambiente Render, o Procfile irá chamar as funções `set_webhook_on_startup` (via startup.sh) e `run_ptb_worker` separadamente.")
     logger.info("Certifique-se de que seu Procfile está configurado assim (ou similar):")
     logger.info("  web: gunicorn bot:flask_app --bind 0.0.0.0:$PORT --worker-class gevent --workers 2") # Ajuste --workers conforme sua necessidade
     logger.info("  worker: python -c \"from bot import run_ptb_worker; run_ptb_worker()\"")
-
-    # Exemplo de como as funções seriam chamadas pelo Procfile no Render:
-    # (Não descomente isto, é apenas para ilustrar o que o Procfile faz)
-    # start_web_service()
-    # flask_app.run(host='0.0.0.0', port=os.getenv("PORT", 5000)) # Gunicorn fará isso
-    # run_ptb_worker()
