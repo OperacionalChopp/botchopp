@@ -5,7 +5,7 @@ from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
 import asyncio
 import json
-# threading foi removido pois não é mais necessário
+import threading # Re-adicionado para rodar o PTB em uma thread separada
 
 # Configuração de logging
 logging.basicConfig(
@@ -19,8 +19,7 @@ TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
 # Verificação para garantir que o token foi carregado
 if not TELEGRAM_BOT_TOKEN:
     logger.error("ERRO: A variável de ambiente 'BOT_TOKEN' não foi encontrada. Certifique-se de que está configurada no Render.")
-    # Dependendo da criticidade, você pode querer levantar uma exceção para parar a aplicação
-    # raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set.")
+    # raise ValueError("TELEGRAM_BOT_TOKEN environment variable not set.") # Não vamos parar a aplicação, apenas logar o erro
 
 WEBHOOK_URL = "https://botchopp.onrender.com/api/telegram/webhook" # Seu webhook do Render.com
 
@@ -232,6 +231,7 @@ async def telegram_webhook():
             logger.info(f"Dados da atualização recebidos: {json.dumps(update_data, indent=2)}")
 
             logger.info("Tentando colocar a atualização na fila da aplicação do Telegram.")
+            # Coloca a atualização na fila para ser processada pela aplicação do PTB
             await application.update_queue.put(Update.de_json(update_data, bot_instance))
             logger.info("Atualização colocada na fila com sucesso.")
 
@@ -267,29 +267,51 @@ async def set_webhook_on_startup():
     except Exception as e:
         logger.error(f"Erro ao configurar webhook: {e}", exc_info=True)
 
+# NOVO: Função para rodar a aplicação do python-telegram-bot em uma thread separada
+def run_ptb_application():
+    if application:
+        # Cria um novo loop de eventos para esta thread
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        
+        logger.info("Iniciando a execução da aplicação do python-telegram-bot (em thread separada com run_forever).")
+        # run_forever() é apropriado para webhooks, pois mantém o loop ativo
+        # para processar a fila de updates, mas não tenta iniciar um servidor web.
+        try:
+            new_loop.run_until_complete(application.run_forever())
+        except Exception as e:
+            logger.error(f"Erro no loop de run_forever do PTB: {e}", exc_info=True)
+        finally:
+            # Garante que o loop é fechado quando a aplicação para
+            new_loop.close()
+        logger.info("Thread do python-telegram-bot encerrada.")
+    else:
+        logger.critical("Aplicação do python-telegram-bot não pode ser iniciada em thread separada pois o token não foi carregado.")
+
 
 # --- ESTA É A FUNÇÃO run_bot_and_server QUE DEVE ESTAR NO SEU ARQUIVO ---
 # Função a ser chamada pelo Procfile para iniciar o Flask
 # e configurar o webhook do PTB
 def run_bot_and_server():
     logger.info("Iniciando setup do ambiente para o bot e servidor Flask.")
-    # Configura o webhook uma vez ao iniciar o serviço
-    # Isso é crucial para que o Telegram saiba para onde enviar as atualizações.
-    # Precisamos aguardar esta operação assíncrona.
+    
+    # 1. Configura o webhook uma vez ao iniciar o serviço
     try:
         asyncio.run(set_webhook_on_startup())
         logger.info("Webhook configurado com sucesso (ou já estava configurado).")
     except Exception as e:
         logger.error(f"Falha ao configurar o webhook na inicialização: {e}", exc_info=True)
-        # Dependendo da criticidade, você pode querer sair ou continuar
         # Se o webhook não configurar, o bot não receberá mensagens do Telegram.
+        # Mas não vamos interromper o servidor Flask.
 
-    # Não precisamos chamar application.run_polling() ou application.start() aqui.
-    # A aplicação do python-telegram-bot (application) já está construída
-    # (se o token estiver ok) e seus handlers estão registrados.
-    # O Flask, rodando via Gunicorn, vai receber os updates do Telegram
-    # e passá-los para application.update_queue, que o PTB sabe como processar.
-    # Apenas garantir que o Flask esteja pronto para ser iniciado.
+    # 2. Inicia o loop de eventos do python-telegram-bot em uma thread separada
+    if application:
+        ptb_thread = threading.Thread(target=run_ptb_application, daemon=True)
+        ptb_thread.start()
+        logger.info("Thread do python-telegram-bot iniciada para processar updates.")
+    else:
+        logger.critical("Não foi possível iniciar a thread do python-telegram-bot pois a aplicação não foi construída.")
+
     logger.info("Servidor Flask pronto para ser iniciado pelo Gunicorn.")
 
 # Este bloco só é executado se o arquivo for rodado diretamente (para testes locais)
@@ -302,3 +324,4 @@ if __name__ == '__main__':
     # No Render, o Procfile chamará run_bot_and_server() e o Gunicorn iniciará o Flask.
     # Portanto, não precisamos do flask_app.run() aqui.
     pass
+        
