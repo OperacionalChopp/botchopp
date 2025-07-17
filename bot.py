@@ -43,21 +43,24 @@ if not REDIS_URL:
     logger.critical("ERRO CRÍTICO: A variável de ambiente 'REDIS_URL' NÃO foi encontrada. O bot não pode iniciar sem o Redis.")
     sys.exit(1)
 
-# --- Conexão Redis e RQ (Revertido para a versão anterior que "quase" funcionava) ---
+# --- Conexão Redis e RQ ---
 redis_conn = None
 queue = None
 try:
-    # Apenas com ssl_cert_reqs=ssl.CERT_NONE, como era antes dos problemas mais recentes
+    # A configuração ssl_cert_reqs=ssl.CERT_NONE é para ignorar a validação do certificado,
+    # mas o erro 'WRONG_VERSION_NUMBER' indica uma falha na negociação do protocolo TLS.
+    # Manteremos essa opção, mas a solução mais provável virá da versão do redis-py e/ou Python.
     redis_conn = Redis.from_url(
         REDIS_URL,
         decode_responses=True,
-        ssl_cert_reqs=ssl.CERT_NONE # Mantém esta configuração que foi adicionada anteriormente
+        ssl_cert_reqs=ssl.CERT_NONE # Mantém esta configuração para tentar ignorar validação de cert
     )
     redis_conn.ping() # Testa a conexão
     queue = Queue(connection=redis_conn)
     logger.info("Conexão Redis estabelecida com sucesso!")
 except Exception as e:
     logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. Verifique a URL e a disponibilidade do serviço Redis. O bot não poderá iniciar: {e}.")
+    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao conectar ao Redis: {e}"))
     sys.exit(1)
 
 # --- Carregamento da Base de Conhecimento (FAQ) ---
@@ -74,12 +77,15 @@ try:
     logger.info("faq_data.json carregado com sucesso!")
 except FileNotFoundError:
     logger.critical(f"ERRO CRÍTICO: O arquivo faq_data.json NÃO foi encontrado em {faq_path}. Verifique se o arquivo foi commitado e enviado para o repositório Git na pasta 'base_conhecimento'.")
+    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' não encontrou faq_data.json."))
     sys.exit(1)
 except json.JSONDecodeError as e:
     logger.critical(f"ERRO CRÍTICO: Erro ao decodificar JSON em {faq_path}. Verifique a formatação do JSON: {e}")
+    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' erro ao ler faq_data.json: {e}"))
     sys.exit(1)
 except Exception as e:
     logger.critical(f"ERRO CRÍTICO: Um erro inesperado ocorreu ao carregar faq_data.json: {e}")
+    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' erro inesperado ao carregar FAQ: {e}"))
     sys.exit(1)
 
 # --- Instância do Flask App ---
@@ -169,11 +175,12 @@ async def webhook():
     logger.debug(f"Webhook: Recebida atualização - {update.update_id}")
 
     try:
-        # Usar application.update_queue.put(update) para processar assincronamente
-        # ou processar diretamente se o flask for async (com uvicorn worker)
-        await application.process_update(update) # process_update é assíncrono
+        # process_update é um método assíncrono do Application do PTB
+        await application.process_update(update)
     except Exception as e:
         logger.error(f"Erro ao processar atualização do Telegram: {e}")
+        # Envia um alerta para o admin se um webhook falhar
+        asyncio.create_task(send_admin_message(f"ERRO: Bot '{BOT_USERNAME}' falhou ao processar webhook: {e}"))
         abort(500)
 
     return 'ok'
