@@ -5,14 +5,12 @@ import json
 import threading
 from flask import Flask, request, jsonify
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler
-from telegram.ext import ApplicationBuilder
+from telegram.ext import Application, MessageHandler, filters, CallbackQueryHandler, CommandHandler, ApplicationBuilder
 
 # Para a fila com Redis
 import redis
-from rq import Queue, Worker
-from rq.job import Job
-from redis.exceptions import ConnectionError as RedisConnectionError # Importar o erro específico
+from rq import Queue
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 # --- Configuração de Logging ---
 logging.basicConfig(
@@ -22,17 +20,25 @@ logger = logging.getLogger(__name__)
 
 # --- Variáveis de Ambiente e Configurações ---
 TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN")
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# REDIS_URL deve vir do ambiente (Render)
+REDIS_URL = os.getenv("REDIS_URL") 
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
-# Verificação para garantir que o token foi carregado
+# Verificação para garantir que as variáveis essenciais foram carregadas
 if not TELEGRAM_BOT_TOKEN:
     logger.critical("ERRO CRÍTICO: A variável de ambiente 'BOT_TOKEN' não foi encontrada. Certifique-se de que está configurada no Render.")
+    exit(1) # Sai do processo se o token não estiver disponível
+
+if not REDIS_URL:
+    logger.critical("ERRO CRÍTICO: A variável de ambiente 'REDIS_URL' não foi encontrada. Certifique-se de que está configurada no Render.")
+    exit(1) # Sai do processo se o REDIS_URL não estiver disponível
+
+if not WEBHOOK_URL:
+    logger.warning("AVISO: A variável de ambiente 'WEBHOOK_URL' não foi encontrada. O bot pode não funcionar corretamente em produção. Certifique-se de que está configurada no Render.")
 
 # --- Carregamento da Base de Conhecimento ---
-# O faq_data.json está dentro da pasta 'base_conhecimento'
-# Obter o caminho absoluto do diretório do script atual
 script_dir = os.path.dirname(os.path.abspath(__file__))
-faq_file_path = os.path.join(script_dir, 'base_conhecimento', 'faq_data.json') # Caminho corrigido
+faq_file_path = os.path.join(script_dir, 'base_conhecimento', 'faq_data.json')
 
 logger.info(f"Caminho absoluto do diretório do script: {script_dir}")
 logger.info(f"Tentando carregar faq_data.json de: {faq_file_path}")
@@ -40,48 +46,50 @@ logger.info(f"Tentando carregar faq_data.json de: {faq_file_path}")
 faq_data = {}
 try:
     if not os.path.exists(faq_file_path):
-        logger.critical(f"ERRO CRÍTICO: O arquivo faq_data.json NÃO foi encontrado em {faq_file_path}. Por favor, verifique a localização do arquivo.")
+        # AQUI: Se o arquivo não existe, é um erro crítico no deploy.
+        logger.critical(f"ERRO CRÍTICO: O arquivo faq_data.json NÃO foi encontrado em {faq_file_path}. Verifique se o arquivo foi commitado e enviado para o repositório.")
+        exit(1) # Impede o bot de iniciar sem a base de conhecimento
     else:
         with open(faq_file_path, 'r', encoding='utf-8') as f:
             faq_data = json.load(f)
         logger.info("faq_data.json carregado com sucesso!")
-except FileNotFoundError:
+except FileNotFoundError: # Embora o os.path.exists já trate, é bom manter para robustez.
     logger.critical(f"ERRO CRÍTICO: O arquivo faq_data.json não foi encontrado em {faq_file_path}. Worker não poderá iniciar.")
+    exit(1)
 except json.JSONDecodeError as e:
-    logger.critical(f"ERRO CRÍTICO: Erro ao carregar faq_data.json. Verifique o formato JSON: {e}")
+    logger.critical(f"ERRO CRÍTICO: Erro ao carregar faq_data.json. Verifique o formato JSON: {e}. Worker não poderá iniciar.")
+    exit(1)
+except Exception as e:
+    logger.critical(f"ERRO INESPERADO ao carregar faq_data.json: {e}. Worker não poderá iniciar.")
+    exit(1)
+
 
 # --- Configuração do Redis ---
-# Remover 'ssl_cert_reqs=None' e 'ssl_check_hostname=False' da chamada redis.from_url()
-# é a abordagem mais recomendada, pois permite que a biblioteca Redis lide com a negociação SSL automaticamente
-# e evita o erro 'WRONG_VERSION_NUMBER' se o URL estiver correto.
-# O problema atual no log ('rediss://defaul') indica que o REDIS_URL está truncado.
+redis_conn = None # Inicializa como None para controle de erro
 try:
+    # A biblioteca 'redis-py' lida bem com 'rediss://' e SSL automaticamente.
+    # Evitamos configurações SSL explícitas para permitir a negociação padrão.
     redis_conn = redis.from_url(
         REDIS_URL,
         decode_responses=True,
-        # As linhas abaixo foram removidas para uma conexão SSL mais robusta,
-        # pois o erro WRONG_VERSION_NUMBER geralmente se resolve deixando a biblioteca negociar.
-        # ssl_cert_reqs=None,
-        # ssl_check_hostname=False
+        socket_connect_timeout=10 # Aumenta o timeout para conexão
     )
     redis_conn.ping() # Testar a conexão
     logger.info("Conexão com Redis estabelecida com sucesso.")
 except RedisConnectionError as e:
     logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. Verifique a URL e a disponibilidade do serviço Redis. Worker não poderá iniciar: {e}")
-    # É CRÍTICO que o worker não inicie sem Redis, então...
     exit(1) # Sai do processo se a conexão Redis falhar
+except Exception as e:
+    logger.critical(f"ERRO INESPERADO ao conectar ao Redis: {e}. Worker não poderá iniciar.")
+    exit(1)
 
-# Configuração da fila RQ
 queue = Queue(connection=redis_conn)
 
 # --- Funções do Bot ---
 
 async def start(update: Update, context):
-    # Garante que 'faq_data' não está vazio antes de tentar acessar
-    if faq_data and "1" in faq_data:
-        await update.message.reply_text(faq_data.get("1", {}).get("resposta", "Olá! Como posso ajudar?"))
-    else:
-        await update.message.reply_text("Olá! Estou tendo problemas para carregar minha base de conhecimento. Por favor, tente novamente mais tarde.")
+    response_text = faq_data.get("1", {}).get("resposta", "Olá! Como posso ajudar? Minha base de conhecimento está carregada.")
+    await update.message.reply_text(response_text)
 
 async def help_command(update: Update, context):
     await update.message.reply_text("Eu sou um bot de FAQ. Você pode me perguntar sobre chopps, eventos, etc.")
@@ -91,7 +99,7 @@ async def process_message(update: Update, context):
     best_match = None
     max_matches = 0
 
-    if not faq_data: # Adicionado para evitar erro se faq_data não carregar
+    if not faq_data:
         await update.message.reply_text("Desculpe, minha base de conhecimento não está disponível no momento.")
         return
 
@@ -105,17 +113,23 @@ async def process_message(update: Update, context):
     if best_match:
         await update.message.reply_text(best_match)
     else:
-        # Se não encontrar correspondência, enfileira a pergunta para a IA
         user_id = update.effective_user.id
-        message_id = update.message.message_id
+        # chat_id para enviar a resposta de volta
+        chat_id = update.effective_chat.id 
         
-        # Envia a mensagem de "pensando"
         thinking_message = await update.message.reply_text("🤔 Pensando na sua resposta...")
         
-        # Enfileira a tarefa no Redis
+        # Enfileira a tarefa no Redis. Note que 'bot_worker.process_ai_query' foi alterado para 'worker.process_ai_query'
+        # para refletir o nome do novo arquivo do worker.
         job = queue.enqueue(
-            'bot_worker.process_ai_query', # 'bot_worker' é o nome do seu arquivo worker, e 'process_ai_query' a função
-            {'user_id': user_id, 'chat_id': update.effective_chat.id, 'message_text': user_message, 'thinking_message_id': thinking_message.message_id},
+            'worker.process_ai_query', # 'worker' é o nome do arquivo, 'process_ai_query' a função
+            {
+                'user_id': user_id, 
+                'chat_id': chat_id, 
+                'message_text': user_message, 
+                'thinking_message_id': thinking_message.message_id,
+                'telegram_bot_token': TELEGRAM_BOT_TOKEN # Passa o token para o worker, pois ele também precisa enviar mensagens
+            },
             job_timeout=300 # Tempo limite maior para a IA
         )
         logger.info(f"Tarefa de IA enfileirada com ID: {job.id}")
@@ -132,41 +146,4 @@ app = Flask(__name__)
 def index():
     return "Bot está rodando!"
 
-@app.route('/webhook', methods=['POST'])
-async def webhook():
-    if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), application.bot)
-        await application.process_update(update)
-        return jsonify({"status": "ok"}), 200
-    return jsonify({"status": "bad request"}), 400
-
-# --- Início do Bot ---
-def run_bot():
-    global application
-    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-
-    # Handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(button))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, process_message))
-
-    # Configurar webhook
-    webhook_url = os.getenv("WEBHOOK_URL")
-    if webhook_url:
-        logger.info(f"Configurando webhook para: {webhook_url}/webhook")
-        application.run_webhook(
-            listen="0.0.0.0",
-            port=int(os.getenv("PORT", "5000")),
-            url_path="webhook",
-            webhook_url=f"{webhook_url}/webhook"
-        )
-    else:
-        logger.warning("WEBHOOK_URL não configurada. O bot pode não funcionar corretamente no Render.")
-        # Se não há webhook_url, podemos tentar polling para desenvolvimento local
-        logger.info("Iniciando bot em modo polling para desenvolvimento local (se não for no Render)...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == "__main__":
-    run_bot()
+@
