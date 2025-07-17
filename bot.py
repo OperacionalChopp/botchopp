@@ -6,7 +6,6 @@ from flask import Flask, request, jsonify
 import redis
 import json
 import asyncio # Necessário para create_task e para rodar funcoes async
-# import ssl # Não é mais necessário importar ssl se não usarmos ssl.PROTOCOL_TLSv1_2 diretamente.
 
 # Configuração de logging
 logging.basicConfig(
@@ -35,10 +34,10 @@ if not REDIS_URL:
     exit(1)
 if not GEMINI_API_KEY:
     logger.warning("GEMINI_API_KEY não está configurado. A funcionalidade Gemini pode estar limitada.")
-    # Não vamos encerrar aqui, pois o bot pode funcionar parcialmente sem Gemini, mas registraremos o erro.
-    # Se a integração com Gemini for CRÍTICA, você pode adicionar 'exit(1)' aqui.
 
 # Função para enviar mensagem ao administrador (definida antes da conexão Redis para uso imediato)
+# Note: Esta função ainda é assíncrona e precisa de um loop de eventos.
+# Para chamadas críticas na inicialização *antes* do loop, a abordagem síncrona ou log é preferível.
 async def send_admin_message(message_text: str):
     if ADMIN_CHAT_ID:
         try:
@@ -51,17 +50,18 @@ async def send_admin_message(message_text: str):
         logger.warning("ADMIN_CHAT_ID não está configurado. Não é possível enviar mensagens de administrador.")
 
 # Conexão com o Redis
+# Removendo a chamada `asyncio.create_task` aqui, pois este é um ponto crítico
+# antes do loop de eventos principal do Uvicorn estar ativo.
+# O `exit(1)` já garante que o serviço não continue se o Redis não estiver acessível.
 try:
-    # A URL 'rediss://' já indica que SSL deve ser usado.
-    # Os argumentos 'ssl_cert_reqs' e 'ssl_version' causaram 'TypeError'
-    # na versão de redis-py que está sendo usada no ambiente Render.
-    # Removê-los permite que a biblioteca gerencie o SSL com base na URL.
     redis_conn = redis.from_url(REDIS_URL)
     redis_conn.ping()  # Testa a conexão
     logger.info("Conectado ao Redis com sucesso!")
 except Exception as e: # Capture Exception para pegar TypeErrors e ConnectionErrors
     logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. O bot não poderá iniciar. Erro: {e}.")
-    asyncio.create_task(send_admin_message(f"🚨 ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao conectar ao Redis na inicialização: {e}"))
+    # Se você *realmente* precisa enviar uma mensagem de admin aqui, ela teria que ser síncrona
+    # ou o serviço teria que ser iniciado de forma diferente. Por simplicidade e robustez,
+    # neste ponto, vamos confiar nos logs e no `exit(1)`.
     exit(1) # Finaliza a execução se não conseguir conectar ao Redis
 
 # Carregar base de conhecimento (exemplo de como carregar um JSON)
@@ -136,20 +136,16 @@ async def webhook_handler():
     """Lida com as requisições POST do webhook do Telegram."""
     if request.method == "POST":
         json_data = request.get_json(force=True)
-        # logger.debug(f"Webhook data: {json_data}") # Cuidado com logs verbosos em prod.
         update = Update.de_json(json_data, application.bot)
         
         try:
-            # Processa a atualização
-            # Para ambientes de produção com Gunicorn/Uvicorn, a forma mais robusta é
-            # enfileirar as atualizações para um worker RQ.
-            # Para este exemplo direto, processamos na mesma thread Flask/Uvicorn,
-            # o que pode ser um gargalo para alta carga, mas funciona para começar.
+            # `application.process_update` já lida com a execução assíncrona
+            # dentro do contexto do loop de eventos do Uvicorn/Flask.
             await application.process_update(update)
             logger.info(f"Update do Telegram processado com sucesso para update_id {update.update_id}")
         except Exception as e:
             logger.error(f"Erro ao processar update do Telegram {update.update_id}: {e}", exc_info=True)
-            # Envia o erro para o administrador.
+            # Aqui, como já estamos dentro de um loop de eventos, podemos usar asyncio.create_task
             asyncio.create_task(send_admin_message(f"🚨 Erro no bot '{BOT_USERNAME}' ao processar update {update.update_id}: {e}"))
         return "ok"
     return "ok"
@@ -167,7 +163,6 @@ if __name__ == '__main__':
     # No Render, o Gunicorn/Uvicorn que inicializa o 'app'.
     # A configuração do webhook deve ser feita no script de inicialização do Render (startup.sh)
     # ou por uma chamada API única, não a cada inicialização do processo worker.
-    # No entanto, se precisar de um fallback ou para testes locais:
     async def set_my_webhook():
         try:
             bot = Bot(token=BOT_TOKEN)
@@ -179,20 +174,34 @@ if __name__ == '__main__':
                 logger.info("Webhook já está configurado corretamente.")
         except Exception as e:
             logger.error(f"Falha ao configurar o webhook: {e}", exc_info=True)
-            asyncio.create_task(send_admin_message(f"🚨 ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao configurar o webhook na inicialização: {e}"))
+            # Aqui, se não houver um loop, a mensagem não será enviada.
+            # Para testes locais, pode ser útil. Em produção, confie nos logs.
+            print(f"ERRO: Falha ao configurar o webhook na inicialização: {e}")
 
-    # Tenta configurar o webhook. asyncio.run() criará um novo loop de eventos.
+    # Tenta configurar o webhook. `asyncio.run()` cria um novo loop de eventos
+    # e só deve ser usado se *não* houver um loop rodando.
     # No ambiente de produção com Gunicorn/Uvicorn, o loop de eventos já é gerenciado.
-    # Se você vir um "RuntimeError: Event loop is already running", é normal.
+    # Se você executa este script com `python bot.py`, ele funcionará.
+    # Se for pelo Gunicorn, esta parte será ignorada ou causará o erro.
+    # A maneira mais limpa para o Render é chamar o `set_webhook` APENAS NO SEU STARTUP COMMAND.
+    # Vou manter o `asyncio.run` para o uso local, mas ciente que Gunicorn não usará isso.
     try:
-        asyncio.run(set_my_webhook())
+        if os.environ.get("RUN_FLASK_LOCALLY") == "true" or not os.environ.get("RENDER"):
+            # Este é um hack para rodar localmente ou quando não estiver no Render
+            # e realmente querer que o bot inicie o loop Flask.
+            # Para produção no Render, a linha `app.run` e `asyncio.run(set_my_webhook())`
+            # *não serão executadas* porque o Gunicorn importa `app` diretamente.
+            asyncio.run(set_my_webhook())
+            port = int(os.environ.get("PORT", 5000))
+            logger.info(f"Iniciando aplicativo Flask na porta {port}")
+            app.run(host="0.0.0.0", port=port)
+        else:
+            logger.info("Executando no ambiente Render. Gunicorn/Uvicorn gerenciará a execução.")
+            # Não chame app.run() ou asyncio.run() aqui, pois o Gunicorn/Uvicorn fará isso.
+            # O Render assume que seu `gunicorn bot:app` no `Start Command`
+            # é o suficiente para iniciar a aplicação.
+            pass # O Gunicorn irá importar `app` e iniciá-lo.
     except RuntimeError as e:
         logger.warning(f"Não foi possível configurar o webhook via asyncio.run (provavelmente o loop de eventos já está ativo pelo Uvicorn/Gunicorn): {e}")
     except Exception as e:
-        logger.error(f"Erro inesperado ao tentar configurar o webhook: {e}", exc_info=True)
-
-    # Inicia o servidor Flask localmente se o script for executado diretamente.
-    # No Render, o Gunicorn/Uvicorn fará isso.
-    port = int(os.environ.get("PORT", 5000))
-    logger.info(f"Iniciando aplicativo Flask na porta {port}")
-    app.run(host="0.0.0.0", port=port)
+        logger.error(f"Erro inesperado ao tentar configurar o webhook na inicialização local: {e}", exc_info=True)
