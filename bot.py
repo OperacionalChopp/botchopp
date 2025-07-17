@@ -3,7 +3,7 @@
 import os
 from flask import Flask, request
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters # Importações atualizadas!
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 # Seus handlers (comandos e mensagens)
 async def start(update: Update, context): # Adicionado 'async' para handlers
@@ -30,7 +30,8 @@ def main():
     # A PTB 20+ gerencia o webhook de forma diferente para Flask
     app = Flask(__name__)
 
-    @app.route(f'/{TOKEN}', methods=['POST'])
+    # ROTA DO WEBHOOK CORRIGIDA AQUI:
+    @app.route('/webhook', methods=['POST'])
     async def webhook_handler(): # Handler do Flask agora é async
         """Processa as atualizações do Telegram via webhook."""
         # A atualização vem como JSON do Telegram
