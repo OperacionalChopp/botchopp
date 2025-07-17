@@ -1,5 +1,3 @@
-# bot.py (VERSÃO FINAL E CORRIGIDA PARA O DEPLOY NO RENDER COM DEBUG)
-
 import os
 import json
 from flask import Flask, request
@@ -11,8 +9,8 @@ FAQ_DATA = {}
 try:
     with open('faq_data.json', 'r', encoding='utf-8') as f:
         FAQ_DATA = json.load(f)
-    print(f"DEBUG: FAQ_DATA carregado com {len(FAQ_DATA)} entradas.") # <-- LINHA DE DEBUG ADICIONADA AQUI
-    print(f"DEBUG: Conteúdo de FAQ_DATA (primeiras 500 chars): {str(FAQ_DATA)[:500]}") # <-- Outra linha de DEBUG
+    print(f"DEBUG: FAQ_DATA carregado com {len(FAQ_DATA)} entradas.")
+    print(f"DEBUG: Conteúdo de FAQ_DATA (primeiras 500 chars): {str(FAQ_DATA)[:500]}")
 except FileNotFoundError:
     print("ERRO: faq_data.json não encontrado. Certifique-se de que o arquivo está na raiz do projeto.")
 except json.JSONDecodeError:
@@ -90,7 +88,7 @@ async def handle_message(update: Update, context):
 
 async def handle_callback_query(update: Update, context):
     query = update.callback_query
-    await query.answer()
+    await query.answer() # Importante para remover o estado de carregamento do botão
 
     callback_data = query.data 
     
@@ -129,7 +127,11 @@ async def handle_callback_query(update: Update, context):
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
 
-    await query.edit_message_text(text=response_text, reply_markup=reply_markup)
+    # --- LINHA MODIFICADA AQUI: ENVIAR NOVA MENSAGEM AO INVÉS DE EDITAR ---
+    await context.bot.send_message(chat_id=query.message.chat_id, text=response_text, reply_markup=reply_markup)
+    
+    # Opcional: Se quiser que a mensagem original com os botões seja deletada, descomente a linha abaixo:
+    # await query.message.delete()
 
 def main():
     TOKEN = os.environ.get('BOT_TOKEN')
@@ -153,9 +155,7 @@ def main():
 
     return app
 
-# --- LINHA ADICIONADA/MODIFICADA PARA O DEPLOY NO RENDER ---
-# Esta linha chama a função main() e atribui o objeto Flask retornado à variável 'app'
-# no escopo global, para que o Gunicorn (servidor web do Render) possa encontrá-la.
+# --- LINHA NECESSÁRIA PARA O DEPLOY NO RENDER ---
 app = main()
 
 # As linhas abaixo são para execução local e devem permanecer comentadas para o Render.
