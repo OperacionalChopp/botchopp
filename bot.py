@@ -1,4 +1,4 @@
-# bot.py (SUGESTÃO DE MODIFICAÇÃO PARA handle_message)
+# bot.py (SUGESTÃO DE MODIFICAÇÃO PARA handle_message e handle_callback_query)
 
 import os
 import json
@@ -49,7 +49,7 @@ async def handle_message(update: Update, context):
     # Lista para coletar IDs/perguntas de FAQs relacionadas que podem ser apresentadas em botões
     related_faq_buttons = []
     
-    found_exact_match = False
+    found_exact_match = False # Flag para saber se já encontramos uma resposta direta
 
     for faq_id, entry in FAQ_DATA.items():
         if faq_id == "1": # Pula a FAQ de boas-vindas
@@ -63,45 +63,85 @@ async def handle_message(update: Update, context):
         
         if matches:
             # Se a resposta for para 'Falar com Alguém' (ID 6 no novo FAQ sugerido)
-            if faq_id == "6": # Atualizado para ID 6 conforme seu FAQ_DATA.json sugerido
+            if faq_id == "6": 
                 response_text = entry["resposta"]
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
-                found_exact_match = True
-                break # Encerra o loop, pois uma ação específica foi tomada
-            
-            # Se a palavra-chave é muito específica e queremos dar a resposta direta
-            # Você precisará definir o que é "específico" para o seu bot.
-            # Ex: Se a pergunta do FAQ for "Qual o horário de funcionamento?" e o usuário digitar isso.
-            # Ou se você quer que certas FAQs sempre deem resposta direta.
-            # Por enquanto, vamos considerar que se achou uma palavra-chave, é uma resposta direta.
+                found_exact_match = True # Marca como match exato para sair do loop
+                break 
             
             # Se o texto do usuário contiver a pergunta exata do FAQ ou uma palavra-chave muito forte,
-            # talvez queiramos dar a resposta direta e encerrar.
-            # Exemplo (você pode ajustar esta lógica):
-            if any(user_text == kw for kw in entry_keywords): # Se o input do usuário for IGUAL a uma palavra-chave
+            # ou se você deseja que esta entrada sempre dê uma resposta direta.
+            # Você pode ajustar esta lógica para ser mais ou menos "exata".
+            # Por exemplo, se user_text == "qual o horário de funcionamento" e 'horário de funcionamento' está em entry_keywords:
+            if user_text in entry_keywords or any(user_text == kw for kw in entry_keywords): 
                 response_text = entry["resposta"]
                 found_exact_match = True
-                break # Encerra o loop, achou um match exato
+                break 
             
-            # Se não for um match exato, mas tiver palavras-chave correspondentes,
-            # adiciona para sugerir em botões, se não houver um match direto ainda.
+            # Se não for um match exato, mas encontrou palavras-chave, adiciona para sugerir em botões.
+            # Adicionamos apenas se ainda não achamos um match exato.
             if not found_exact_match:
-                related_faq_buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=entry["id"])])
+                related_faq_buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
 
     if found_exact_match:
+        # Se um match exato ou ação específica foi encontrada, envia a resposta.
         await update.message.reply_text(response_text, reply_markup=reply_markup)
     elif related_faq_buttons:
-        # Se encontrou FAQs relacionadas mas não um match direto
-        # Opcional: Adicionar uma mensagem introdutória para as opções
+        # Se encontrou FAQs relacionadas (não um match exato), apresenta botões.
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você gostaria de saber?",
             reply_markup=InlineKeyboardMarkup(related_faq_buttons)
         )
     else:
-        # Nenhuma palavra-chave encontrada, retorna a mensagem padrão
+        # Nenhuma palavra-chave encontrada, retorna a mensagem padrão.
         await update.message.reply_text(response_text, reply_markup=reply_markup)
 
-# ... (O resto do seu código main() e app = main() permanece o mesmo) ...
+async def handle_callback_query(update: Update, context):
+    query = update.callback_query
+    await query.answer()
+
+    callback_data = query.data # Será o ID do FAQ (como string) ou a callback_data original ("onde_fica", "horario")
+    
+    response_text = "Desculpe, não consegui encontrar uma resposta para esta opção."
+    reply_markup = None
+
+    # Lógica para os botões fixos do /start
+    if callback_data == "onde_fica":
+        entry = FAQ_DATA.get("4") # Supondo que "4" seja o ID para "Onde fica a loja?"
+        if entry:
+            response_text = entry["resposta"]
+    elif callback_data == "horario":
+        entry = FAQ_DATA.get("3") # Supondo que "3" seja o ID para "Qual nosso horário?"
+        if entry:
+            response_text = entry["resposta"]
+    elif callback_data == "cardapio":
+        entry = FAQ_DATA.get("5") # Supondo que "5" seja o ID para "Quero ver o cardápio"
+        if entry:
+            response_text = entry["resposta"]
+    elif callback_data == "duvida_ia":
+        # Lógica para a dúvida com a IA, se for implementar uma integração específica
+        response_text = "Para tirar dúvidas mais complexas, por favor, me diga sua pergunta e tentarei ajudar."
+    elif callback_data == "falar_com_alguem":
+        entry = FAQ_DATA.get("6") # Supondo que "6" seja o ID para "Falar com alguém"
+        if entry:
+            response_text = entry["resposta"]
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
+                [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
+            ])
+    else:
+        # Lógica para os botões gerados dinamicamente (com callback_data sendo o ID do FAQ)
+        entry = FAQ_DATA.get(callback_data) 
+        if entry:
+            response_text = entry["resposta"]
+            # Adicionar botões específicos se a resposta for do tipo 'Falar com alguém' (ID 6)
+            if callback_data == "6": 
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
+                    [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
+                ])
+
+    await query.edit_message_text(text=response_text
