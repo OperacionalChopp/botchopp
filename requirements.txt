@@ -1,9 +1,19 @@
 Flask>=3.1.1
 python-telegram-bot==22.2
-redis>=5.3.0
+redis>=6.2.0
 rq>=2.4.0
-uvicorn>=0.35.0 # Adicione se ainda não tiver
-gunicorn>=23.0.0 # Adicione se ainda não tiver
+uvicorn>=0.35.0
+gunicorn>=23.0.0
 httpx<0.29,>=0.27
 anyio
-# E quaisquer outras dependências que você tinha
+certifi
+httpcore
+idna
+h11
+blinker
+click
+itsdangerous
+jinja2
+markupsafe
+werkzeug
+sniffio
