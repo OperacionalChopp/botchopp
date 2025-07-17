@@ -1,19 +1,19 @@
-Flask>=3.1.1
+Flask==3.1.1
 python-telegram-bot==22.2
-redis>=6.2.0
-rq>=2.4.0
-uvicorn>=0.35.0
-gunicorn>=23.0.0
-httpx<0.29,>=0.27
-anyio
-certifi
-httpcore
-idna
-h11
-blinker
-click
-itsdangerous
-jinja2
-markupsafe
-werkzeug
-sniffio
+redis==5.0.1
+rq==1.15.1 # Versão estável mais recente do RQ que funciona bem com Redis 5.x.
+uvicorn==0.35.0
+gunicorn==23.0.0
+httpx==0.28.1 # Fixando para evitar surpresas.
+anyio==4.3.0 # Fixando para garantir compatibilidade com httpx.
+certifi==2024.7.4 # Fixando para uma versão recente e estável.
+httpcore==1.0.5 # Fixando para garantir compatibilidade com httpx.
+idna==3.7 # Fixando para uma versão recente e estável.
+h11==0.14.0 # Fixando para garantir compatibilidade.
+blinker==1.7.0 # Fixando para uma versão recente e estável.
+click==8.1.7 # Fixando para uma versão recente e estável.
+itsdangerous==2.1.2 # Fixando para uma versão recente e estável.
+jinja2==3.1.4 # Fixando para uma versão recente e estável.
+markupsafe==2.1.5 # Fixando para uma versão recente e estável.
+werkzeug==3.0.1 # Fixando para uma versão recente e estável.
+sniffio==1.3.1
