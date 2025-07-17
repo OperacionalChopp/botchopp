@@ -46,7 +46,7 @@ async def handle_message(update: Update, context):
     reply_markup = None
 
     for faq_id, entry in FAQ_DATA.items():
-        if faq_id == "1":
+        if faq_id == "1": # Pula a FAQ de boas-vindas para não ser acionada por texto
             continue
         
         found_keywords = [
@@ -62,14 +62,14 @@ async def handle_message(update: Update, context):
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")], # NÚMERO ATUALIZADO AQUI
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")] # NÚMERO ATUALIZADO AQUI
                 ])
-            break
+            break # Parar após encontrar a primeira palavra-chave correspondente
 
     await update.message.reply_text(response_text, reply_markup=reply_markup)
 
 async def handle_callback_query(update: Update, context):
     """Processa cliques nos botões inline."""
     query = update.callback_query
-    await query.answer()
+    await query.answer() # Notifica o Telegram que a query foi recebida
 
     callback_data = query.data
     response_text = "Opção não reconhecida ou em desenvolvimento."
@@ -112,6 +112,40 @@ async def handle_callback_query(update: Update, context):
         response_text = "Estou pronto para tirar suas dúvidas! Digite sua pergunta agora e tentarei responder com base nas minhas informações. Se precisar de algo que não sei, use a opção 'Falar com alguém'."
     
     elif callback_data == "falar_com_alguem":
-        contact_entry = FAQ_DATA.get("4")
+        contact_entry = FAQ_DATA.get("4") # Assumindo que FAQ_ID "4" é para Falar com Alguém
         if contact_entry:
-            response_text = contact_entry["
+            response_text = contact_entry["resposta"]
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")], # NÚMERO ATUALIZADO AQUI
+                [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")] # NÚMERO ATUALIZADO AQUI
+            ])
+        else:
+            response_text = "Opção de contato 'Falar com alguém' não encontrada no FAQ. Por favor, verifique o arquivo FAQ."
+    
+    await query.edit_message_text(text=response_text, reply_markup=reply_markup)
+
+# Função principal que retorna a aplicação Flask para o Gunicorn
+def main():
+    TOKEN = os.environ.get('BOT_TOKEN')
+    WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+    PORT = int(os.environ.get('PORT', '5000'))
+
+    application = Application.builder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
+
+    app = Flask(__name__)
+
+    @app.route(f'/{TOKEN}', methods=['POST'])
+    async def webhook_handler():
+        json_data = await request.get_json(force=True)
+        update = Update.de_json(json_data, application.bot)
+        await application.process_update(update)
+        return 'ok'
+
+    return app
+
+# Para gunicorn rodar o Flask, ele precisa de uma variável 'app' global
+app = main()
