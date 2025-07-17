@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify
 import redis
 import json
 import asyncio # Necessário para create_task e para rodar funcoes async
-import ssl # Necessário para configurar opções SSL para Redis
+# import ssl # Não é mais necessário importar ssl se não usarmos ssl.PROTOCOL_TLSv1_2 diretamente.
 
 # Configuração de logging
 logging.basicConfig(
@@ -34,7 +34,7 @@ if not REDIS_URL:
     logger.critical("REDIS_URL não está configurado. O bot não pode iniciar.")
     exit(1)
 if not GEMINI_API_KEY:
-    logger.critical("GEMINI_API_KEY não está configurado. O bot não pode iniciar.")
+    logger.warning("GEMINI_API_KEY não está configurado. A funcionalidade Gemini pode estar limitada.")
     # Não vamos encerrar aqui, pois o bot pode funcionar parcialmente sem Gemini, mas registraremos o erro.
     # Se a integração com Gemini for CRÍTICA, você pode adicionar 'exit(1)' aqui.
 
@@ -51,31 +51,17 @@ async def send_admin_message(message_text: str):
         logger.warning("ADMIN_CHAT_ID não está configurado. Não é possível enviar mensagens de administrador.")
 
 # Conexão com o Redis
-# Tentativa de resolver o erro SSL: WRONG_VERSION_NUMBER
 try:
-    redis_conn = redis.from_url(
-        REDIS_URL,
-        ssl_cert_reqs=None, # Desabilita a verificação do certificado (PARA TESTE/DEPURAÇÃO, NÃO RECOMENDADO EM PROD.)
-        ssl_version=ssl.PROTOCOL_TLSv1_2 # Força o uso do TLS 1.2, uma versão comum. Pode tentar ssl.PROTOCOL_TLS_CLIENT.
-    )
+    # A URL 'rediss://' já indica que SSL deve ser usado.
+    # Os argumentos 'ssl_cert_reqs' e 'ssl_version' causaram 'TypeError'
+    # na versão de redis-py que está sendo usada no ambiente Render.
+    # Removê-los permite que a biblioteca gerencie o SSL com base na URL.
+    redis_conn = redis.from_url(REDIS_URL)
     redis_conn.ping()  # Testa a conexão
     logger.info("Conectado ao Redis com sucesso!")
-except redis.exceptions.ConnectionError as e:
-    logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. Verifique a URL e a disponibilidade do serviço Redis. O bot não poderá iniciar: {e}.")
-    # Tenta enviar mensagem de erro para o admin, garantindo que seja uma tarefa asyncio.
-    # Se o loop de eventos ainda não estiver rodando (primeira vez que o Gunicorn/Uvicorn carrega o módulo),
-    # create_task pode falhar com "no running event loop".
-    # Em um cenário de Gunicorn/Uvicorn, a importação do módulo acontece antes do loop ser iniciado.
-    # Por isso, lidar com esse erro de forma síncrona ou com um atraso é mais seguro.
-    try:
-        # Se você quer garantir que a mensagem seja enviada, mesmo que o bot não inicie,
-        # pode tentar uma abordagem síncrona aqui se for possível, ou ajustar o entrypoint.
-        # Para evitar 'RuntimeError: no running event loop' durante a inicialização do Gunicorn/Uvicorn,
-        # é melhor não usar asyncio.create_task diretamente neste ponto crítico de inicialização.
-        # O exit(1) abaixo já garante que o processo falhe.
-        pass # Removemos o asyncio.create_task aqui para evitar o 'RuntimeError: no running event loop'
-    except Exception as exc:
-        logger.error(f"Não foi possível agendar mensagem de administrador durante erro de conexão Redis: {exc}")
+except Exception as e: # Capture Exception para pegar TypeErrors e ConnectionErrors
+    logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. O bot não poderá iniciar. Erro: {e}.")
+    asyncio.create_task(send_admin_message(f"🚨 ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao conectar ao Redis na inicialização: {e}"))
     exit(1) # Finaliza a execução se não conseguir conectar ao Redis
 
 # Carregar base de conhecimento (exemplo de como carregar um JSON)
