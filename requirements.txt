@@ -1,6 +1,9 @@
-Flask[async]>=3.1.1
+Flask>=3.1.1
 python-telegram-bot==22.2
-uvicorn==0.35.0
-gunicorn==23.0.0
-redis==5.3.0  # MUDANÇA AQUI: Para uma versão 5.x específica e disponível
-rq
+redis>=5.3.0
+rq>=2.4.0
+uvicorn>=0.35.0 # Adicione se ainda não tiver
+gunicorn>=23.0.0 # Adicione se ainda não tiver
+httpx<0.29,>=0.27
+anyio
+# E quaisquer outras dependências que você tinha
