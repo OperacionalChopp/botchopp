@@ -46,7 +46,8 @@ except Exception as e:
 faq_data = [] # Inicializa como lista vazia por segurança
 try:
     # Caminho ajustado: o Render geralmente coloca os arquivos na raiz do projeto
-    with open('faq_data.json', 'r', encoding='utf-8') as f:
+    # A ÚNICA LINHA QUE FOI ALTERADA É A SEGUINTE:
+    with open('base_conhecimento/faq_data.json', 'r', encoding='utf-8') as f: #
         faq_data = json.load(f)
     logger.info("faq_data.json carregado com sucesso.")
 except FileNotFoundError:
