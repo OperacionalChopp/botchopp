@@ -1,4 +1,4 @@
-# bot.py (SUGESTÃO DE MODIFICAÇÃO PARA handle_message e handle_callback_query)
+# bot.py (VERSÃO CORRIGIDA COM PARÊNTESE QUE FALTAVA)
 
 import os
 import json
@@ -46,86 +46,71 @@ async def handle_message(update: Update, context):
     response_text = "Desculpe, não consegui encontrar uma resposta para sua pergunta no momento. Por favor, tente reformular ou use os botões abaixo para explorar as opções."
     reply_markup = None
     
-    # Lista para coletar IDs/perguntas de FAQs relacionadas que podem ser apresentadas em botões
     related_faq_buttons = []
     
-    found_exact_match = False # Flag para saber se já encontramos uma resposta direta
+    found_exact_match = False 
 
     for faq_id, entry in FAQ_DATA.items():
-        if faq_id == "1": # Pula a FAQ de boas-vindas
+        if faq_id == "1": 
             continue
         
-        # Converte as palavras-chave para minúsculas para comparação
         entry_keywords = [kw.lower() for kw in entry.get("palavras_chave", [])]
 
-        # Verifica se alguma palavra-chave da entrada está no texto do usuário
         matches = [kw for kw in entry_keywords if kw in user_text]
         
         if matches:
-            # Se a resposta for para 'Falar com Alguém' (ID 6 no novo FAQ sugerido)
             if faq_id == "6": 
                 response_text = entry["resposta"]
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
-                found_exact_match = True # Marca como match exato para sair do loop
+                found_exact_match = True 
                 break 
             
-            # Se o texto do usuário contiver a pergunta exata do FAQ ou uma palavra-chave muito forte,
-            # ou se você deseja que esta entrada sempre dê uma resposta direta.
-            # Você pode ajustar esta lógica para ser mais ou menos "exata".
-            # Por exemplo, se user_text == "qual o horário de funcionamento" e 'horário de funcionamento' está em entry_keywords:
             if user_text in entry_keywords or any(user_text == kw for kw in entry_keywords): 
                 response_text = entry["resposta"]
                 found_exact_match = True
                 break 
             
-            # Se não for um match exato, mas encontrou palavras-chave, adiciona para sugerir em botões.
-            # Adicionamos apenas se ainda não achamos um match exato.
             if not found_exact_match:
                 related_faq_buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
 
     if found_exact_match:
-        # Se um match exato ou ação específica foi encontrada, envia a resposta.
         await update.message.reply_text(response_text, reply_markup=reply_markup)
     elif related_faq_buttons:
-        # Se encontrou FAQs relacionadas (não um match exato), apresenta botões.
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você gostaria de saber?",
             reply_markup=InlineKeyboardMarkup(related_faq_buttons)
         )
     else:
-        # Nenhuma palavra-chave encontrada, retorna a mensagem padrão.
         await update.message.reply_text(response_text, reply_markup=reply_markup)
 
 async def handle_callback_query(update: Update, context):
     query = update.callback_query
     await query.answer()
 
-    callback_data = query.data # Será o ID do FAQ (como string) ou a callback_data original ("onde_fica", "horario")
+    callback_data = query.data 
     
     response_text = "Desculpe, não consegui encontrar uma resposta para esta opção."
     reply_markup = None
 
-    # Lógica para os botões fixos do /start
     if callback_data == "onde_fica":
-        entry = FAQ_DATA.get("4") # Supondo que "4" seja o ID para "Onde fica a loja?"
+        entry = FAQ_DATA.get("4") 
         if entry:
             response_text = entry["resposta"]
     elif callback_data == "horario":
-        entry = FAQ_DATA.get("3") # Supondo que "3" seja o ID para "Qual nosso horário?"
+        entry = FAQ_DATA.get("3") 
         if entry:
             response_text = entry["resposta"]
     elif callback_data == "cardapio":
-        entry = FAQ_DATA.get("5") # Supondo que "5" seja o ID para "Quero ver o cardápio"
+        entry = FAQ_DATA.get("5") 
         if entry:
             response_text = entry["resposta"]
     elif callback_data == "duvida_ia":
-        # Lógica para a dúvida com a IA, se for implementar uma integração específica
         response_text = "Para tirar dúvidas mais complexas, por favor, me diga sua pergunta e tentarei ajudar."
     elif callback_data == "falar_com_alguem":
-        entry = FAQ_DATA.get("6") # Supondo que "6" seja o ID para "Falar com alguém"
+        entry = FAQ_DATA.get("6") 
         if entry:
             response_text = entry["resposta"]
             reply_markup = InlineKeyboardMarkup([
@@ -133,15 +118,36 @@ async def handle_callback_query(update: Update, context):
                 [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
             ])
     else:
-        # Lógica para os botões gerados dinamicamente (com callback_data sendo o ID do FAQ)
         entry = FAQ_DATA.get(callback_data) 
         if entry:
             response_text = entry["resposta"]
-            # Adicionar botões específicos se a resposta for do tipo 'Falar com alguém' (ID 6)
             if callback_data == "6": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
 
-    await query.edit_message_text(text=response_text
+    # A linha abaixo foi corrigida com o parêntese final
+    await query.edit_message_text(text=response_text, reply_markup=reply_markup)
+
+def main():
+    TOKEN = os.environ.get('BOT_TOKEN')
+    WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+    PORT = int(os.environ.get('PORT', '5000'))
+
+    application = Application.builder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
+
+    app = Flask(__name__)
+
+    @app.route(f'/{TOKEN}', methods=['POST'])
+    async def webhook_handler():
+        json_data = await request.get_json(force=True)
+        update = Update.de_json(json_data, application.bot)
+        await application.process_update(update)
+        return 'ok'
+
+    return app
