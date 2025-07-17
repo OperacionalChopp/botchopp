@@ -35,7 +35,8 @@ def main():
     async def webhook_handler(): # Handler do Flask agora é async
         """Processa as atualizações do Telegram via webhook."""
         # A atualização vem como JSON do Telegram
-        json_data = await request.get_json(force=True)
+        # CORREÇÃO: Removido 'await' de request.get_json()
+        json_data = request.get_json(force=True)
         update = Update.de_json(json_data, application.bot)
 
         # Processa a atualização com a Application
