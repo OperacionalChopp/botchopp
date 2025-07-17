@@ -1,220 +1,167 @@
 import os
-import json
 import logging
-import ssl
-import sys
-from flask import Flask, request, abort
-from redis import Redis
 from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, MessageHandler, filters
-from rq import Queue
-import asyncio
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from flask import Flask, request, jsonify
+import redis
+import json
+import asyncio # Necessário para create_task e para rodar funcoes async
 
-# --- Configuração de Logging (Melhorado) ---
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+# Configuração de logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=getattr(logging, LOG_LEVEL)
+    level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# --- Variáveis de Ambiente e Configurações ---
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # Embora não usado diretamente no código atual, é bom manter
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-REDIS_URL = os.getenv("REDIS_URL")
+# Configurações do bot - Carregadas de variáveis de ambiente
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+REDIS_URL = os.environ.get("REDIS_URL")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID") # Adicione esta variável de ambiente no Render
+BOT_USERNAME = os.environ.get("BOT_USERNAME", "botchopp_bot") # Nome de usuário do bot para mensagens de erro
 
-# --- Chat ID do Administrador (para alertas) ---
-# Converta para int, com um valor padrão seguro
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", "12345")) # Mude para o seu ID real, se for diferente.
-
-# --- Nome de Usuário do Bot ---
-BOT_USERNAME = os.getenv("BOT_USERNAME", 'Brahmachoppexpress_bot')
-
-# --- Verificações de Variáveis Essenciais ---
 if not BOT_TOKEN:
-    logger.critical("ERRO CRÍTICO: A variável de ambiente 'BOT_TOKEN' NÃO foi encontrada. O bot não pode iniciar.")
-    sys.exit(1)
-
+    logger.critical("BOT_TOKEN não está configurado. O bot não pode iniciar.")
+    exit(1)
 if not WEBHOOK_URL:
-    logger.warning("AVISO: A variável de ambiente 'WEBHOOK_URL' não foi encontrada. O bot pode não funcionar corretamente em produção. Certifique-se de que está configurada no Render.")
-
+    logger.critical("WEBHOOK_URL não está configurado. O bot não pode iniciar.")
+    exit(1)
 if not REDIS_URL:
-    logger.critical("ERRO CRÍTICO: A variável de ambiente 'REDIS_URL' NÃO foi encontrada. O bot não pode iniciar sem o Redis.")
-    sys.exit(1)
+    logger.critical("REDIS_URL não está configurado. O bot não pode iniciar.")
+    exit(1)
+if not GEMINI_API_KEY:
+    logger.critical("GEMINI_API_KEY não está configurado. O bot não pode iniciar.")
+    exit(1)
 
-# --- Conexão Redis e RQ ---
-redis_conn = None
-queue = None
+# Função para enviar mensagem ao administrador (definida aqui para resolver o NameError)
+async def send_admin_message(message_text: str):
+    if ADMIN_CHAT_ID:
+        try:
+            bot = Bot(token=BOT_TOKEN)
+            await bot.send_message(chat_id=ADMIN_CHAT_ID, text=message_text)
+            logger.info(f"Mensagem de administrador enviada com sucesso para {ADMIN_CHAT_ID}")
+        except Exception as e:
+            logger.error(f"Falha ao enviar mensagem de administrador para {ADMIN_CHAT_ID}: {e}")
+    else:
+        logger.warning("ADMIN_CHAT_ID não está configurado. Não é possível enviar mensagens de administrador.")
+
+# Conexão com o Redis
 try:
-    # A configuração ssl_cert_reqs=ssl.CERT_NONE é para ignorar a validação do certificado,
-    # mas o erro 'WRONG_VERSION_NUMBER' indica uma falha na negociação do protocolo TLS.
-    # Manteremos essa opção, mas a solução mais provável virá da versão do redis-py e/ou Python.
-    redis_conn = Redis.from_url(
-        REDIS_URL,
-        decode_responses=True,
-        ssl_cert_reqs=ssl.CERT_NONE # Mantém esta configuração para tentar ignorar validação de cert
-    )
-    redis_conn.ping() # Testa a conexão
-    queue = Queue(connection=redis_conn)
-    logger.info("Conexão Redis estabelecida com sucesso!")
-except Exception as e:
+    redis_conn = redis.from_url(REDIS_URL)
+    redis_conn.ping()  # Testa a conexão
+    logger.info("Conectado ao Redis com sucesso!")
+except redis.exceptions.ConnectionError as e:
     logger.critical(f"ERRO CRÍTICO: Não foi possível conectar ao Redis em {REDIS_URL}. Verifique a URL e a disponibilidade do serviço Redis. O bot não poderá iniciar: {e}.")
+    # Tenta enviar mensagem de erro para o admin, mas o bot pode não ter inicializado completamente
     asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao conectar ao Redis: {e}"))
-    sys.exit(1)
+    exit(1) # Finaliza a execução se não conseguir conectar ao Redis
 
-# --- Carregamento da Base de Conhecimento (FAQ) ---
+# Carregar base de conhecimento
 FAQ_DATA = {}
-script_dir = os.path.dirname(os.path.abspath(__file__))
-faq_path = os.path.join(script_dir, 'base_conhecimento', 'faq_data.json')
-
-logger.info(f"Caminho absoluto do diretório do script: {script_dir}")
-logger.info(f"Tentando carregar faq_data.json de: {faq_path}")
-
 try:
-    with open(faq_path, 'r', encoding='utf-8') as f:
+    with open("base_conhecimento/faq_data.json", "r", encoding="utf-8") as f:
         FAQ_DATA = json.load(f)
-    logger.info("faq_data.json carregado com sucesso!")
+    logger.info("Base de conhecimento FAQ carregada com sucesso.")
 except FileNotFoundError:
-    logger.critical(f"ERRO CRÍTICO: O arquivo faq_data.json NÃO foi encontrado em {faq_path}. Verifique se o arquivo foi commitado e enviado para o repositório Git na pasta 'base_conhecimento'.")
-    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' não encontrou faq_data.json."))
-    sys.exit(1)
-except json.JSONDecodeError as e:
-    logger.critical(f"ERRO CRÍTICO: Erro ao decodificar JSON em {faq_path}. Verifique a formatação do JSON: {e}")
-    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' erro ao ler faq_data.json: {e}"))
-    sys.exit(1)
-except Exception as e:
-    logger.critical(f"ERRO CRÍTICO: Um erro inesperado ocorreu ao carregar faq_data.json: {e}")
-    asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' erro inesperado ao carregar FAQ: {e}"))
-    sys.exit(1)
+    logger.error("Arquivo faq_data.json não encontrado. A base de conhecimento não será utilizada.")
+except json.JSONDecodeError:
+    logger.error("Erro ao decodificar faq_data.json. Verifique a formatação do JSON.")
 
-# --- Instância do Flask App ---
+# Inicializar o aplicativo Flask
 app = Flask(__name__)
 
-# --- Funções do Bot ---
-def find_answer(question):
-    question_lower = question.lower()
-    best_match = None
-    best_score = 0
+# Inicializar o bot do Telegram
+application = Application.builder().token(BOT_TOKEN).build()
 
-    for key, item in FAQ_DATA.items():
-        keywords = [kw.lower() for kw in item.get('palavras_chave', [])]
-        for keyword in keywords:
-            if keyword in question_lower:
-                if len(keyword) > best_score:
-                    best_score = len(keyword)
-                    best_match = item['resposta']
-                break
 
-    if best_match:
-        return best_match
-    return "Desculpe, não entendi sua pergunta. Poderia reformulá-la?"
+# Handlers do Telegram (exemplo de implementação, adapte conforme sua lógica)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("Olá! Eu sou o BotChopp. Como posso ajudar?")
 
-async def start_command(update: Update, context):
-    logger.info(f"Comando /start recebido de {update.effective_user.id}")
-    await update.message.reply_text("Olá! Eu sou o Bot Chopp. Como posso ajudar você hoje?")
+async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # Exemplo: Responder com a mesma mensagem
+    await update.message.reply_text(update.message.text)
 
-async def help_command(update: Update, context):
-    logger.info(f"Comando /help recebido de {update.effective_user.id}")
-    await update.message.reply_text("Posso responder perguntas sobre nosso chopp, horários de funcionamento e mais. Basta perguntar!")
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_message = update.message.text.lower()
+    response = "Desculpe, não entendi. Tente perguntar de outra forma."
 
-async def handle_message(update: Update, context):
-    user_message = update.message.text
-    user_id = update.effective_user.id
-    logger.info(f"Mensagem de {user_id}: {user_message}")
+    # Exemplo simples de busca na FAQ
+    for entry in FAQ_DATA.get("perguntas_frequentes", []):
+        if any(keyword in user_message for keyword in entry["palavras_chave"]):
+            response = entry["resposta"]
+            break
+    
+    # Se não encontrar na FAQ, pode passar para o Gemini (exemplo)
+    # if response == "Desculpe, não entendi. Tente perguntar de outra forma.":
+    #    try:
+    #        # Aqui você integraria com a API do Gemini
+    #        # Ex: response = await call_gemini_api(user_message, GEMINI_API_KEY)
+    #        response = f"Você perguntou: '{user_message}'. (Integração Gemini aqui)"
+    #    except Exception as e:
+    #        logger.error(f"Erro ao chamar API Gemini: {e}")
+    #        response = "No momento, não consigo processar sua solicitação com a IA. Tente mais tarde."
 
-    # Ignora mensagens de grupo que não mencionam o bot e não são comandos
-    if update.message.chat.type != 'private' and not user_message.startswith('/'):
-        # Verifica se o bot foi mencionado
-        if BOT_USERNAME.lower() in user_message.lower():
-            # Remove a menção ao bot para processar a pergunta
-            response_text = find_answer(user_message.replace(f"@{BOT_USERNAME}", "").strip())
-            await update.message.reply_text(response_text)
-            return
-        else:
-            # Se não mencionou o bot em grupo, ignora
-            return
-
-    # Para mensagens privadas ou comandos em grupo
-    response = find_answer(user_message)
     await update.message.reply_text(response)
 
+# Adicionar handlers ao dispatcher
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# --- Envio de Mensagem para o Admin ---
-async def send_admin_message(message: str):
-    bot_instance = Bot(token=BOT_TOKEN) # Criar a instância do bot dentro da função
-    try:
-        await asyncio.sleep(1) # Pequena pausa para garantir que o log seja escrito antes
-        await bot_instance.send_message(chat_id=ADMIN_CHAT_ID, text=message)
-        logger.info(f"Mensagem de admin enviada: {message}")
-    except Exception as e:
-        logger.error(f"Falha ao enviar mensagem para o admin {ADMIN_CHAT_ID}: {e}")
+# Rota para receber atualizações do webhook
+@app.route("/", methods=["POST"])
+async def webhook_handler():
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        
+        # Processar a atualização
+        # NOTA: Em produção com Gunicorn e Uvicorn, você deve usar run_polling ou set_webhook
+        # e o processamento de atualizações em background com a Application.
+        # Para um webhook, a abordagem comum é usar application.update_queue.put(update)
+        # e um worker separado (rq) para processar a fila.
+        # Este exemplo simples processa diretamente para fins de teste/demonstração.
+        try:
+            await application.process_update(update)
+        except Exception as e:
+            logger.error(f"Erro ao processar update do Telegram: {e}")
+            # Você pode querer enviar este erro para o admin também
+            asyncio.create_task(send_admin_message(f"Erro ao processar update no bot: {e}"))
+        return "ok"
+    return "ok"
 
-# --- Configuração do Application do PTB (para o Webhook) ---
-application = ApplicationBuilder().token(BOT_TOKEN).build()
+# Rota de health check
+@app.route("/health", methods=["GET"])
+def health_check():
+    return "Bot is running", 200
 
-application.add_handler(MessageHandler(filters.COMMAND, start_command))
-application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-
-
-# --- Rotas do Flask para o Webhook ---
-@app.route('/webhook', methods=['POST'])
-async def webhook():
-    if not BOT_TOKEN:
-        logger.error("Webhook recebido, mas BOT_TOKEN não está configurado.")
-        abort(500)
-
-    bot_instance = Bot(token=BOT_TOKEN)
-    update_data = request.get_json()
-
-    if not update_data:
-        logger.warning("Webhook recebido sem dados JSON.")
-        abort(400)
-
-    update = Update.de_json(update_data, bot_instance)
-    logger.debug(f"Webhook: Recebida atualização - {update.update_id}")
-
-    try:
-        # process_update é um método assíncrono do Application do PTB
-        await application.process_update(update)
-    except Exception as e:
-        logger.error(f"Erro ao processar atualização do Telegram: {e}")
-        # Envia um alerta para o admin se um webhook falhar
-        asyncio.create_task(send_admin_message(f"ERRO: Bot '{BOT_USERNAME}' falhou ao processar webhook: {e}"))
-        abort(500)
-
-    return 'ok'
-
-@app.route('/')
-def hello_world():
-    return 'Bot is running!'
-
-# --- Configuração e Início do Webhook ---
-# Esta função será chamada pela rota /set_webhook
-async def setup_webhook():
-    logger.info(f"Configurando webhook para: {WEBHOOK_URL}")
-    bot_instance = Bot(token=BOT_TOKEN)
-    try:
-        await bot_instance.set_webhook(url=WEBHOOK_URL, allowed_updates=["message"])
-        logger.info("Webhook configurado com sucesso!")
-        # Enviar mensagem para o admin APÓS o webhook ser configurado
-        asyncio.create_task(send_admin_message(f"Bot '{BOT_USERNAME}' iniciado e webhook configurado com sucesso no Render!"))
-    except Exception as e:
-        logger.critical(f"ERRO CRÍTICO: Falha ao configurar o webhook no Telegram: {e}")
-        asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao configurar o webhook: {e}"))
-        sys.exit(1) # Finaliza o processo se o webhook não puder ser configurado
-
-@app.route('/set_webhook', methods=['GET'])
-async def set_webhook_route():
-    try:
-        await setup_webhook()
-        return 'Webhook setup initiated successfully!'
-    except Exception as e:
-        logger.error(f"Erro ao iniciar setup do webhook pela rota: {e}")
-        return f"Erro ao iniciar setup do webhook: {e}", 500
-
+# Execução do aplicativo Flask (para o Gunicorn/Uvicorn)
 if __name__ == '__main__':
-    # Em ambientes como o Render/Gunicorn, este bloco não é executado diretamente para rodar o app.
-    # A linha de comando `gunicorn bot:app` é que faz o Flask app rodar.
-    # A configuração do webhook é feita via acesso à rota /set_webhook.
-    logger.info("Script bot.py executado diretamente. Isso é normal em ambientes de desenvolvimento ou para testes específicos.")
+    # Configura o webhook na inicialização
+    # Em um ambiente de produção, esta configuração pode ser feita uma vez ou gerenciada externamente
+    # No Render, geralmente o `startup.sh` ou similar cuida de setar o webhook.
+    # Este bloco é mais para teste local ou para garantir que o webhook seja configurado.
+    async def set_my_webhook():
+        try:
+            bot = Bot(token=BOT_TOKEN)
+            await bot.set_webhook(url=WEBHOOK_URL)
+            logger.info(f"Webhook configurado para: {WEBHOOK_URL}")
+        except Exception as e:
+            logger.error(f"Falha ao configurar o webhook: {e}")
+            asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao configurar o webhook: {e}"))
+
+    # Para rodar a função async em um contexto não-async
+    # Isso é comum em scripts de inicialização ou quando usado diretamente
+    try:
+        asyncio.run(set_my_webhook())
+    except RuntimeError as e:
+        logger.warning(f"Não foi possível configurar o webhook via asyncio.run (pode já estar em um loop de eventos): {e}")
+        # Se você está rodando com gunicorn/uvicorn, eles criam seu próprio loop de eventos.
+        # Nesse caso, `asyncio.run` falharia. A solução é usar `asyncio.create_task`
+        # ou garantir que o webhook seja configurado pelo script de startup.sh.
+        # Para fins de deploy no Render, o `startup.sh` é o local mais robusto para isso.
+    
+    # Este bloco só é executado se você rodar o arquivo diretamente (e não via gunicorn/uvicorn)
+    # Para Render, o Gunicorn/Uvicorn se encarrega de iniciar o app.
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
