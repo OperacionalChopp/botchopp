@@ -1,4 +1,4 @@
-# bot.py (VERSÃO CORRIGIDA COM PARÊNTESE QUE FALTAVA)
+# bot.py (VERSÃO FINAL E CORRIGIDA PARA O DEPLOY NO RENDER)
 
 import os
 import json
@@ -127,7 +127,6 @@ async def handle_callback_query(update: Update, context):
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
 
-    # A linha abaixo foi corrigida com o parêntese final
     await query.edit_message_text(text=response_text, reply_markup=reply_markup)
 
 def main():
@@ -151,3 +150,14 @@ def main():
         return 'ok'
 
     return app
+
+# --- LINHA ADICIONADA/MODIFICADA PARA O DEPLOY NO RENDER ---
+# Esta linha chama a função main() e atribui o objeto Flask retornado à variável 'app'
+# no escopo global, para que o Gunicorn (servidor web do Render) possa encontrá-la.
+app = main()
+
+# As linhas abaixo são para execução local e devem permanecer comentadas para o Render.
+# if __name__ == '__main__':
+#     from dotenv import load_dotenv
+#     load_dotenv()
+#     app.run(port=os.environ.get('PORT', 5000))
