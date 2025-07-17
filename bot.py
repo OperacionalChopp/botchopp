@@ -26,11 +26,11 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 REDIS_URL = os.getenv("REDIS_URL")
 
 # --- Chat ID do Administrador (para alertas) ---
-# SUBSTITUA 'SEU_CHAT_ID_DO_ADMIN' PELO SEU ID DE CHAT REAL!
-ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", SEU_CHAT_ID_DO_ADMIN)) # Certifique-se que SEU_CHAT_ID_DO_ADMIN é um número ou setado no Render
+# SEU ID DE CHAT REAL JÁ INSERIDO AQUI!
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID", 8086911603))
 
-# SUBSTITUA 'SEU_NOME_DE_USUARIO_DO_BOT' PELO NOME DE USUÁRIO REAL DO SEU BOT!
-BOT_USERNAME = os.getenv("BOT_USERNAME", 'SEU_NOME_DE_USUARIO_DO_BOT')
+# SEU NOME DE USUÁRIO DO BOT REAL JÁ INSERIDO AQUI!
+BOT_USERNAME = os.getenv("BOT_USERNAME", 'Brahmachoppexpress_bot')
 
 # --- Verificações de Variáveis Essenciais ---
 if not BOT_TOKEN:
@@ -164,17 +164,10 @@ async def webhook():
     logger.debug(f"Webhook: Recebida atualização - {update.update_id}")
 
     # Processa a atualização de forma assíncrona
-    # A maneira mais robusta para ambientes de produção é colocar isso em uma fila (RQ)
-    # ou usar `await application.process_update(update)` se o Flask app for async.
-    # Por enquanto, vamos processar diretamente para depuração.
     try:
-        # ATENÇÃO: Se o volume de mensagens for muito alto, esta linha pode causar timeouts no Render.
-        # Nesses casos, o uso de RQ (com o worker separado) é essencial.
         await application.process_update(update)
     except Exception as e:
         logger.error(f"Erro ao processar atualização do Telegram: {e}")
-        # Envia para o admin em caso de erro crítico no processamento de uma atualização
-        # asyncio.create_task(send_admin_message(f"Erro crítico no bot ao processar atualização: {e}"))
         abort(500) # Erro interno
 
     return 'ok'
@@ -199,31 +192,7 @@ async def setup_webhook():
         asyncio.create_task(send_admin_message(f"ERRO CRÍTICO: Bot '{BOT_USERNAME}' falhou ao configurar o webhook: {e}"))
         sys.exit(1) # Sai se não conseguir configurar o webhook
 
-# Adiciona o setup_webhook para ser executado quando o aplicativo Flask é carregado
-# Nota: Com Gunicorn, isso pode ser um pouco tricky, pois cada worker pode tentar configurar.
-# Uma forma mais robusta é ter um script de pre-deploy ou um worker de startup dedicado.
-# Para simplicidade, vamos tentar executá-lo no início do worker.
-# Mas a rota '/' ou qualquer outra pode ser acessada para disparar.
-# Com o gunicorn e uvicorn worker, a forma mais garantida é garantir que esta parte rode apenas uma vez.
-# Como alternativa, podemos chamar isso de dentro da função `hello_world` ou em uma rota de "health check"
-# que seja acessada uma vez após o deploy.
-# Para este setup simples, vamos deixar que o bot tente configurar o webhook no Flask app boot.
-# O problema é que Flask não é realmente async, então o setup_webhook precisa ser await-able
-# e rodar em um loop de evento. O gunicorn/uvicorn lida com o app, não com handlers de startup.
-# A melhor prática é ter o `worker.py` fazendo isso, ou um "pre-deploy command" no Render.
-
-# Para fins de teste inicial e depuração, podemos forçar a execução ao iniciar a aplicação.
-# O `application.run_webhook()` é para o modo de polling, não para o Flask + Gunicorn.
-# Para webhook, o PTB apenas espera que a rota POST seja chamada.
-# A configuração do webhook em si deve ser feita via bot.set_webhook().
-# Uma boa prática seria um script separado ou um pré-deploy command no Render.
-
-# Por enquanto, se você já tem um worker.py configurado para fazer isso, o bot.py não precisa.
-# Se não, vamos adicionar uma forma de garantir que o webhook seja configurado.
-# A maneira mais direta é colocar essa chamada para setup_webhook no worker.py (no serviço de background)
-# ou fazer um POST para a rota '/set_webhook' que chamaria o setup_webhook().
-
-# Para simplificar aqui e garantir que o webhook seja configurado se você não tem um worker.py dedicado a isso:
+# Adiciona uma rota para configurar o webhook manualmente, se necessário
 @app.route('/set_webhook', methods=['GET'])
 async def set_webhook_route():
     try:
@@ -233,53 +202,10 @@ async def set_webhook_route():
         logger.error(f"Erro ao iniciar setup do webhook pela rota: {e}")
         return f"Erro ao iniciar setup do webhook: {e}", 500
 
-# Se você não tem um worker separado para configurar o webhook:
-# Você pode chamar `set_webhook_route` manualmente uma vez após o deploy (acessando a URL /set_webhook).
-# Ou, de forma mais automática, mas menos robusta (pode rodar múltiplas vezes com Gunicorn):
-# asyncio.create_task(setup_webhook()) # Isso seria para um bot que roda em um único processo
-
-# Com o setup atual, você tem um worker.py que deve lidar com filas RQ.
-# O setup do webhook precisa ser feito por um bot.set_webhook()
-# Isso geralmente é feito fora do loop principal do bot, talvez uma única vez
-# por um script de setup ou pelo worker.
-
-# Vou assumir que você tem um worker.py que pode lidar com o setup do webhook
-# ou que você irá acessar a rota `/set_webhook` uma vez após o deploy.
-# Caso contrário, o bot.py vai rodar, mas o Telegram não saberá para onde enviar as mensagens.
-
-
 # A execução principal da aplicação Flask
 if __name__ == '__main__':
-    # Em produção com Gunicorn, o Gunicorn que inicia o app Flask.
-    # No desenvolvimento local, você pode usar:
-    # app.run(debug=True, port=os.getenv("PORT", 5000))
-
-    # Para garantir que o webhook seja configurado *apenas uma vez* no Render:
-    # Uma abordagem mais robusta para o set_webhook é ter um script separado
-    # ou usar o `rq worker` para enfileirar uma tarefa de set_webhook.
-    # Com Gunicorn, cada worker pode tentar fazer isso, o que é ineficiente.
-
-    # POR SEGURANÇA E ROBUSTEZ:
-    # A função `setup_webhook` deve ser chamada APENAS UMA VEZ
-    # preferencialmente por um serviço separado (como o `worker.py` via RQ),
-    # ou como um "Pre-Deploy Command" no Render se ele puder rodar tarefas assíncronas.
-    # Para este setup que temos, o `worker.py` é o lugar ideal para agendar isso.
-
-    # Se você ainda não tem o worker.py fazendo o set_webhook,
-    # considere adicionar uma tarefa RQ para isso.
-    # Por exemplo, no worker.py:
-    # from bot import setup_webhook
-    # q = Queue(connection=redis_conn)
-    # q.enqueue(setup_webhook) # Isso enfileira a tarefa para ser executada pelo worker
-
-    # Se você não tem um worker separado para isso, então o bot vai rodar,
-    # mas o webhook não será configurado automaticamente no Telegram
-    # a menos que você acesse a rota /set_webhook manualmente após o deploy.
-
-    # Para o Render/Gunicorn, a porta é fornecida pela variável de ambiente $PORT
-    port = int(os.getenv("PORT", 5000))
     # Gunicorn já cuida de iniciar a aplicação.
     # Esta parte do código (if __name__ == '__main__') só rodaria se você executasse
     # python bot.py diretamente, sem Gunicorn.
     # Não há necessidade de app.run() aqui com o Gunicorn.
-    pass # Deixa vazio, Gunicorn cuida do start.
+    pass
