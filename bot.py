@@ -1,4 +1,4 @@
-# bot.py (VERSÃO FINAL E CORRIGIDA PARA O DEPLOY NO RENDER)
+# bot.py (VERSÃO FINAL E CORRIGIDA PARA O DEPLOY NO RENDER COM DEBUG)
 
 import os
 import json
@@ -11,6 +11,8 @@ FAQ_DATA = {}
 try:
     with open('faq_data.json', 'r', encoding='utf-8') as f:
         FAQ_DATA = json.load(f)
+    print(f"DEBUG: FAQ_DATA carregado com {len(FAQ_DATA)} entradas.") # <-- LINHA DE DEBUG ADICIONADA AQUI
+    print(f"DEBUG: Conteúdo de FAQ_DATA (primeiras 500 chars): {str(FAQ_DATA)[:500]}") # <-- Outra linha de DEBUG
 except FileNotFoundError:
     print("ERRO: faq_data.json não encontrado. Certifique-se de que o arquivo está na raiz do projeto.")
 except json.JSONDecodeError:
