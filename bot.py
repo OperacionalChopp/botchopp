@@ -28,10 +28,11 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 if not TELEGRAM_BOT_TOKEN:
     logger.critical("ERRO CRÍTICO: A variável de ambiente 'BOT_TOKEN' não foi encontrada. Certifique-se de que está configurada no Render.")
 
-# --- INÍCIO: NOVAS LINHAS PARA DEBUGAR faq_data.json ---
+# --- Carregamento da Base de Conhecimento ---
+# O faq_data.json está dentro da pasta 'base_conhecimento'
 # Obter o caminho absoluto do diretório do script atual
 script_dir = os.path.dirname(os.path.abspath(__file__))
-faq_file_path = os.path.join(script_dir, 'faq_data.json')
+faq_file_path = os.path.join(script_dir, 'base_conhecimento', 'faq_data.json') # Caminho corrigido
 
 logger.info(f"Caminho absoluto do diretório do script: {script_dir}")
 logger.info(f"Tentando carregar faq_data.json de: {faq_file_path}")
@@ -49,14 +50,19 @@ except FileNotFoundError:
 except json.JSONDecodeError as e:
     logger.critical(f"ERRO CRÍTICO: Erro ao carregar faq_data.json. Verifique o formato JSON: {e}")
 
-# --- Configuração do Redis (APENAS A PARTE DA CONEXÃO) ---
+# --- Configuração do Redis ---
+# Remover 'ssl_cert_reqs=None' e 'ssl_check_hostname=False' da chamada redis.from_url()
+# é a abordagem mais recomendada, pois permite que a biblioteca Redis lide com a negociação SSL automaticamente
+# e evita o erro 'WRONG_VERSION_NUMBER' se o URL estiver correto.
+# O problema atual no log ('rediss://defaul') indica que o REDIS_URL está truncado.
 try:
     redis_conn = redis.from_url(
         REDIS_URL,
         decode_responses=True,
-        # Removendo ssl_cert_reqs=None e ssl_check_hostname=False para permitir que a biblioteca Redis
-        # negocie a conexão SSL automaticamente, o que geralmente resolve WRONG_VERSION_NUMBER
-        # Se você tiver problemas persistentes, pode tentar reintroduzi-los COM CAREFUL.
+        # As linhas abaixo foram removidas para uma conexão SSL mais robusta,
+        # pois o erro WRONG_VERSION_NUMBER geralmente se resolve deixando a biblioteca negociar.
+        # ssl_cert_reqs=None,
+        # ssl_check_hostname=False
     )
     redis_conn.ping() # Testar a conexão
     logger.info("Conexão com Redis estabelecida com sucesso.")
@@ -71,7 +77,11 @@ queue = Queue(connection=redis_conn)
 # --- Funções do Bot ---
 
 async def start(update: Update, context):
-    await update.message.reply_text(faq_data.get("1", {}).get("resposta", "Olá! Como posso ajudar?"))
+    # Garante que 'faq_data' não está vazio antes de tentar acessar
+    if faq_data and "1" in faq_data:
+        await update.message.reply_text(faq_data.get("1", {}).get("resposta", "Olá! Como posso ajudar?"))
+    else:
+        await update.message.reply_text("Olá! Estou tendo problemas para carregar minha base de conhecimento. Por favor, tente novamente mais tarde.")
 
 async def help_command(update: Update, context):
     await update.message.reply_text("Eu sou um bot de FAQ. Você pode me perguntar sobre chopps, eventos, etc.")
@@ -80,6 +90,10 @@ async def process_message(update: Update, context):
     user_message = update.message.text.lower()
     best_match = None
     max_matches = 0
+
+    if not faq_data: # Adicionado para evitar erro se faq_data não carregar
+        await update.message.reply_text("Desculpe, minha base de conhecimento não está disponível no momento.")
+        return
 
     for key, data in faq_data.items():
         if "palavras_chave" in data:
@@ -101,12 +115,7 @@ async def process_message(update: Update, context):
         # Enfileira a tarefa no Redis
         job = queue.enqueue(
             'bot_worker.process_ai_query', # 'bot_worker' é o nome do seu arquivo worker, e 'process_ai_query' a função
-            {
-                'user_id': user_id,
-                'chat_id': update.effective_chat.id,
-                'message_text': user_message,
-                'thinking_message_id': thinking_message.message_id # Passa o ID da mensagem "pensando"
-            },
+            {'user_id': user_id, 'chat_id': update.effective_chat.id, 'message_text': user_message, 'thinking_message_id': thinking_message.message_id},
             job_timeout=300 # Tempo limite maior para a IA
         )
         logger.info(f"Tarefa de IA enfileirada com ID: {job.id}")
@@ -160,6 +169,4 @@ def run_bot():
 
 
 if __name__ == "__main__":
-    # Garante que o bot e o Flask rodem em threads diferentes ou com asyncio.run
-    # Para o Render, run_webhook já é non-blocking, então basta chamá-lo
     run_bot()
