@@ -154,7 +154,8 @@ def main():
     @app.route(f'/{TOKEN}', methods=['POST'])
     async def webhook_handler():
         """Processa as atualizações do Telegram via webhook."""
-        json_data = await request.get_json(force=True)
+        # CORREÇÃO APLICADA AQUI: Removido 'await' de request.get_json()
+        json_data = request.get_json(force=True)
         update = Update.de_json(json_data, application.bot)
         await application.process_update(update) # Processa a atualização com a Application do PTB
         return 'ok'
