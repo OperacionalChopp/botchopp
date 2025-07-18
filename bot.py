@@ -28,8 +28,8 @@ def load_faq_data():
     try:
         with open("faq_data.json", "r", encoding="utf-8") as f:
             faq_list = json.load(f)
-            faq_data = {item["pergunta"].lower(): item["resposta"] for item in faq_list}
-        logger.info("FAQ_DATA carregado com sucesso.")
+faq_data = {item["pergunta"].lower(): item["resposta"] for item in faq_list.values()}
+logger.info("FAQ_DATA carregado com sucesso.")
     except FileNotFoundError:
         logger.error("Arquivo faq_data.json não encontrado.")
         faq_data = {}
