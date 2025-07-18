@@ -9,7 +9,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # --- Carregar dados do FAQ ---
 FAQ_DATA = {}
 try:
-    # CORREÇÃO CRÍTICA AQUI: O caminho do arquivo agora é diretamente na raiz,
+    # O caminho do arquivo agora é diretamente na raiz,
     # pois os logs indicam que ele está sendo encontrado lá.
     FAQ_FILE_PATH = 'faq_data.json' 
     
@@ -47,89 +47,79 @@ async def start(update: Update, context):
         await update.message.reply_text('Olá! Eu sou seu bot! Parece que a mensagem de boas-vindas não foi carregada corretamente ou o FAQ_DATA está vazio. Por favor, verifique o arquivo FAQ.')
 
 async def handle_message(update: Update, context):
-    """
-    Processa mensagens de texto (não comandos) e tenta encontrar respostas no FAQ.
-    Prioriza correspondências exatas e oferece botões para correspondências parciais.
-    """
-    user_text = update.message.text.lower().strip() # Normaliza o texto do usuário
-    response_text = "Desculpe, não consegui encontrar uma resposta exata para sua pergunta no momento. Por favor, tente reformular ou escolha uma das opções abaixo."
+    """Processa mensagens de texto (não comandos) e tenta encontrar respostas no FAQ."""
+    user_text = update.message.text.lower().strip()
     
-    potential_matches_exact = [] 
-    potential_matches_partial = [] 
+    # Inicializa a melhor correspondência encontrada
+    best_match_faq_id = None
+    max_matches = 0
+    
+    # Se a mensagem for "olá" ou "oi" (simples), pode direcionar para o start
+    if user_text in ["olá", "ola", "oi", "e aí", "e ai", "opa", "fala"]:
+        await start(update, context) # Chama o handler do /start para exibir a mensagem de boas-vindas com botões
+        return
 
-    # --- Lógica de busca de correspondência ---
     for faq_id, entry in FAQ_DATA.items():
-        if faq_id == "1": # Pula a FAQ de boas-vindas
+        if faq_id == "1": # Pula a FAQ de boas-vindas, já tratada acima
             continue
         
         entry_keywords = [kw.lower().strip() for kw in entry.get("palavras_chave", [])]
         
-        # 1. Procura por correspondência EXATA da mensagem do usuário com uma palavra-chave
-        if user_text in entry_keywords:
-            potential_matches_exact.append((faq_id, entry))
-
-    if potential_matches_exact:
-        if len(potential_matches_exact) == 1:
-            faq_id, entry = potential_matches_exact[0]
-            response_text = entry["resposta"]
-            reply_markup = None
-            if faq_id == "54": # ID para "Falar com alguém"
-                reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
-                    [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
-                ])
-            await update.message.reply_text(response_text, reply_markup=reply_markup)
-            return 
-        else:
-            buttons = []
-            for faq_id, entry in potential_matches_exact:
-                buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
-            await update.message.reply_text(
-                "Encontrei múltiplas respostas para sua pergunta. Qual delas você gostaria de saber?",
-                reply_markup=InlineKeyboardMarkup(buttons)
-            )
-            return
-
-    # 2. Se não encontrou correspondência EXATA, procura por palavras-chave CONTIDAS na mensagem
-    for faq_id, entry in FAQ_DATA.items():
-        if faq_id == "1": 
-            continue
+        # Conta quantas palavras-chave do FAQ estão presentes no texto do usuário
+        current_matches = sum(1 for kw in entry_keywords if kw in user_text)
         
-        entry_keywords = [kw.lower().strip() for kw in entry.get("palavras_chave", [])]
+        # Se a frase completa da palavra-chave estiver na mensagem do usuário, dê uma pontuação extra
+        # Isso prioriza correspondências de frases sobre palavras soltas
+        for kw in entry_keywords:
+            if kw in user_text:
+                current_matches += 2 # Pontuação extra para correspondência de frase completa
         
-        if any(kw in user_text for kw in entry_keywords) or \
-           any(word in ' '.join(entry_keywords) for word in user_text.split()):
-            
-            if not any(btn[0].callback_data == faq_id for btn in potential_matches_partial):
-                potential_matches_partial.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
+        if current_matches > max_matches:
+            max_matches = current_matches
+            best_match_faq_id = faq_id
 
-    if potential_matches_partial:
-        await update.message.reply_text(
-            "Encontrei algumas informações que podem ser úteis. Qual delas você gostaria de saber?",
-            reply_markup=InlineKeyboardMarkup(potential_matches_partial)
-        )
+    response_text = "Desculpe, não consegui encontrar uma resposta para sua pergunta no momento. Por favor, tente reformular ou use os botões abaixo para explorar as opções."
+    reply_markup = None
+
+    if best_match_faq_id:
+        # Se encontrou uma boa correspondência, usa a resposta do FAQ
+        matched_entry = FAQ_DATA[best_match_faq_id]
+        response_text = matched_entry["resposta"]
+        
+        # Se a resposta for o FAQ de "Falar com alguém" (ID 54, anteriormente 4, mas 54 no seu FAQ_DATA.json)
+        if best_match_faq_id == "54": 
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
+                [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
+            ])
     else:
-        keyboard_fallback = [
-            [InlineKeyboardButton("📞 Falar com alguém", callback_data="falar_com_alguem")]
-        ]
-        await update.message.reply_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard_fallback))
+        # Se não encontrou nenhuma boa correspondência, sugere falar com alguém
+        # ou outras opções
+        response_text = "Desculpe, não consegui encontrar uma resposta para sua pergunta no momento. Você pode tentar reformular, usar o comando /start para ver as opções principais, ou:"
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📞 Falar com alguém", callback_data="falar_com_alguem")],
+            # [InlineKeyboardButton("❓ Outras Dúvidas Frequentes", callback_data="duvidas_gerais")] # Adicione essa callback se tiver uma FAQ de dúvidas gerais
+        ])
+
+    await update.message.reply_text(response_text, reply_markup=reply_markup)
 
 
 async def handle_callback_query(update: Update, context):
     query = update.callback_query
-    await query.answer() 
+    await query.answer() # Importante para remover o estado de carregamento do botão
 
     callback_data = query.data 
     
     response_text = "Desculpe, não consegui encontrar uma resposta para esta opção."
     reply_markup = None
 
+    # Mapeamento dos callback_data dos botões iniciais para os IDs de FAQ correspondentes
     mapping = {
-        "onde_fica": "5",     
-        "horario": "3",       
-        "cardapio": "6",      
-        "duvida_ia": None,    
-        "falar_com_alguem": "54" 
+        "onde_fica": "5",     # "Como encontrar a loja Chopp Brahma Express mais próxima?"
+        "horario": "3",       # "Qual é o horário de atendimento de vocês?"
+        "cardapio": "6",      # "Quais produtos estão disponíveis e como selecionar?"
+        "duvida_ia": None,    # Esta é uma ação, a resposta é tratada abaixo
+        "falar_com_alguem": "54" # "Não encontrei minha dúvida. Como posso ser atendido?"
     }
 
     faq_id_from_button = mapping.get(callback_data)
@@ -138,6 +128,7 @@ async def handle_callback_query(update: Update, context):
         entry = FAQ_DATA.get(faq_id_from_button)
         if entry:
             response_text = entry["resposta"]
+            # Condição especial para o botão "Falar com Alguém" (ID 54)
             if faq_id_from_button == "54": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
@@ -148,9 +139,11 @@ async def handle_callback_query(update: Update, context):
     elif callback_data == "duvida_ia":
         response_text = "Estou pronto para tirar suas dúvidas! Digite sua pergunta agora e tentarei responder com base nas minhas informações. Se precisar de algo que não sei, use a opção 'Falar com alguém'."
     else:
-        entry = FAQ_DATA.get(callback_data) 
+        # Caso o callback_data seja diretamente um ID de FAQ (dos botões dinâmicos de handle_message)
+        entry = FAQ_DATA.get(callback_data)
         if entry:
             response_text = entry["resposta"]
+            # Condição especial para a FAQ de "Falar com Alguém" se for acionada dinamicamente
             if callback_data == "54": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
@@ -159,8 +152,12 @@ async def handle_callback_query(update: Update, context):
         else:
             response_text = f"Opção de callback '{callback_data}' não reconhecida ou FAQ ID não encontrado. Verifique os dados."
 
+    # ENVIAR NOVA MENSAGEM AO INVÉS DE EDITAR A ANTERIOR (melhor UX para respostas de botões)
     await context.bot.send_message(chat_id=query.message.chat_id, text=response_text, reply_markup=reply_markup)
     
+    # Opcional: Se quiser que a mensagem original com os botões seja deletada, descomente a linha abaixo:
+    # await query.message.delete()
+
 def main():
     TOKEN = os.environ.get('BOT_TOKEN')
     WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
@@ -176,15 +173,17 @@ def main():
 
     @app.route(f'/{TOKEN}', methods=['POST'])
     async def webhook_handler():
-        json_data = await request.get_json(force=true)
+        json_data = await request.get_json(force=True)
         update = Update.de_json(json_data, application.bot)
         await application.process_update(update)
         return 'ok'
 
     return app
 
+# --- LINHA NECESSÁRIA PARA O DEPLOY NO RENDER ---
 app = main()
 
+# As linhas abaixo são para execução local e devem permanecer comentadas para o Render.
 # if __name__ == '__main__':
 #     from dotenv import load_dotenv
 #     load_dotenv()
