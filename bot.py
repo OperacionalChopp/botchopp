@@ -7,8 +7,7 @@ from telegram.ext import (
     Updater,
     CommandHandler,
     MessageHandler,
-    filters # Alterado de 'Filters' para 'filters'
-    # 'Dispatcher' foi removido desta linha, pois será acessado via updater.dispatcher
+    filters
 )
 from dotenv import load_dotenv
 
@@ -29,9 +28,8 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN)
 # Carrega os dados do FAQ
 try:
     with open('faq_data.json', 'r', encoding='utf-8') as f:
-        raw_faq_list = json.load(f)
-        # CORREÇÃO AQUI: Itera sobre os VALORES do dicionário, não sobre as chaves
-        FAQ_DATA = {str(item['id']): item for item in raw_faq_list.values()}
+        # CORREÇÃO: Carrega o JSON diretamente, pois ele já está no formato de dicionário de dicionários
+        FAQ_DATA = json.load(f)
     logger.info("FAQ_DATA carregado com sucesso.")
 except FileNotFoundError:
     logger.error("Arquivo faq_data.json não encontrado.")
