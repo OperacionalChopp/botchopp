@@ -1,3 +1,5 @@
+# bot.py (VERSÃO CORRIGIDA PARA PALAVRAS-CHAVE E RESPOSTAS DE BOTÕES)
+
 import os
 import json
 from flask import Flask, request
@@ -47,44 +49,50 @@ async def handle_message(update: Update, context):
     reply_markup = None
     
     related_faq_buttons = []
-    
     found_exact_match = False 
 
+    # Para cada entrada do FAQ (pulando a de boas-vindas)
     for faq_id, entry in FAQ_DATA.items():
         if faq_id == "1": 
             continue
         
         entry_keywords = [kw.lower() for kw in entry.get("palavras_chave", [])]
-
-        matches = [kw for kw in entry_keywords if kw in user_text]
         
-        if matches:
-            if faq_id == "6": 
-                response_text = entry["resposta"]
+        # Verifica se a mensagem do usuário é uma palavra-chave exata ou contém uma palavra-chave
+        # prioriza a correspondência exata para a resposta direta
+        if user_text in entry_keywords:
+            response_text = entry["resposta"]
+            # Adiciona botões de contato se for a FAQ de falar com alguém
+            if faq_id == "54": # ID 54 é "Não encontrei minha dúvida. Como posso ser atendido?"
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
-                found_exact_match = True 
-                break 
-            
-            if user_text in entry_keywords or any(user_text == kw for kw in entry_keywords): 
-                response_text = entry["resposta"]
-                found_exact_match = True
-                break 
-            
-            if not found_exact_match:
-                related_faq_buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
+            found_exact_match = True
+            break # Encontrou uma correspondência exata, para a busca
+        
+        # Se não houve correspondência exata, verifica se há palavras-chave contidas
+        # e coleta perguntas relacionadas para apresentar como botões
+        if not found_exact_match:
+            matches = [kw for kw in entry_keywords if kw in user_text]
+            if matches:
+                # Adiciona apenas se ainda não foi adicionado (para evitar duplicatas)
+                # Verifica se o botão já existe na lista antes de adicionar
+                if not any(btn[0].callback_data == faq_id for btn in related_faq_buttons):
+                    related_faq_buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
 
     if found_exact_match:
         await update.message.reply_text(response_text, reply_markup=reply_markup)
     elif related_faq_buttons:
+        # Se encontrou termos relacionados, oferece botões de perguntas
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você gostaria de saber?",
             reply_markup=InlineKeyboardMarkup(related_faq_buttons)
         )
     else:
+        # Se não encontrou nada específico nem relacionado
         await update.message.reply_text(response_text, reply_markup=reply_markup)
+
 
 async def handle_callback_query(update: Update, context):
     query = update.callback_query
@@ -95,37 +103,45 @@ async def handle_callback_query(update: Update, context):
     response_text = "Desculpe, não consegui encontrar uma resposta para esta opção."
     reply_markup = None
 
-    if callback_data == "onde_fica":
-        entry = FAQ_DATA.get("4") 
+    # Mapeamento dos callback_data dos botões iniciais para os IDs de FAQ correspondentes
+    # Usei os IDs do seu `faq_data.json` para mapear os botões do /start
+    mapping = {
+        "onde_fica": "5",     # "Como encontrar a loja Chopp Brahma Express mais próxima?"
+        "horario": "3",       # "Qual é o horário de atendimento de vocês?"
+        "cardapio": "6",      # "Quais produtos estão disponíveis e como selecionar?"
+        "duvida_ia": None,    # Esta é uma ação, não uma FAQ direta
+        "falar_com_alguem": "54" # "Não encontrei minha dúvida. Como posso ser atendido?"
+    }
+
+    faq_id_from_button = mapping.get(callback_data)
+
+    if faq_id_from_button:
+        entry = FAQ_DATA.get(faq_id_from_button)
         if entry:
             response_text = entry["resposta"]
-    elif callback_data == "horario":
-        entry = FAQ_DATA.get("3") 
-        if entry:
-            response_text = entry["resposta"]
-    elif callback_data == "cardapio":
-        entry = FAQ_DATA.get("5") 
-        if entry:
-            response_text = entry["resposta"]
-    elif callback_data == "duvida_ia":
-        response_text = "Para tirar dúvidas mais complexas, por favor, me diga sua pergunta e tentarei ajudar."
-    elif callback_data == "falar_com_alguem":
-        entry = FAQ_DATA.get("6") 
-        if entry:
-            response_text = entry["resposta"]
-            reply_markup = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
-                [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
-            ])
-    else:
-        entry = FAQ_DATA.get(callback_data) 
-        if entry:
-            response_text = entry["resposta"]
-            if callback_data == "6": 
+            # Condição especial para o botão "Falar com Alguém" (ID 54)
+            if faq_id_from_button == "54": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
+        else:
+            response_text = f"Erro: FAQ ID '{faq_id_from_button}' não encontrado para a opção '{callback_data}'."
+    elif callback_data == "duvida_ia":
+        response_text = "Estou pronto para tirar suas dúvidas! Digite sua pergunta agora e tentarei responder com base nas minhas informações. Se precisar de algo que não sei, use a opção 'Falar com alguém'."
+    else:
+        # Caso o callback_data seja diretamente um ID de FAQ (dos botões dinâmicos)
+        entry = FAQ_DATA.get(callback_data) 
+        if entry:
+            response_text = entry["resposta"]
+            # Condição especial para a FAQ de "Falar com Alguém" se for acionada dinamicamente
+            if callback_data == "54": 
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
+                    [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
+                ])
+        else:
+            response_text = f"Opção de callback '{callback_data}' não reconhecida ou FAQ ID não encontrado."
 
     # --- LINHA MODIFICADA AQUI: ENVIAR NOVA MENSAGEM AO INVÉS DE EDITAR ---
     await context.bot.send_message(chat_id=query.message.chat_id, text=response_text, reply_markup=reply_markup)
