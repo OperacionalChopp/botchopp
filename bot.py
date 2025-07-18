@@ -7,7 +7,8 @@ from telegram.ext import (
     Updater,
     CommandHandler,
     MessageHandler,
-    Filters,
+    # A linha abaixo foi alterada: 'Filters' foi substituído por 'filters' (minúsculo)
+    filters,
     Dispatcher
 )
 from dotenv import load_dotenv
@@ -75,7 +76,18 @@ app = Flask(__name__)
 @app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
 def webhook():
     if request.method == "POST":
-        update = Update.dispatcher.update_queue.put(Update.de_json(request.get_json(), bot))
+        # ATENÇÃO: A linha abaixo tem um erro no seu código original.
+        # update = Update.dispatcher.update_queue.put(Update.de_json(request.get_json(), bot))
+        # Isso não deve ser feito diretamente assim para processar o webhook.
+        # O dispatcher do python-telegram-bot lida com isso.
+        # A forma correta é passar o JSON para o dispatcher para que ele processe o update.
+        # No seu setup com Gunicorn, o dispatcher precisa ser acessível globalmente.
+        # Vamos assumir que 'dispatcher' é uma variável global ou acessível aqui.
+        global dispatcher # Declara que vamos usar a variável global 'dispatcher'
+        update_json = request.get_json()
+        if update_json:
+            update = Update.de_json(update_json, bot)
+            dispatcher.process_update(update) # Processa o update usando o dispatcher
         return "ok"
     return "ok"
 
@@ -91,7 +103,9 @@ def main():
 
     # Handlers
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, answer_faq))
+    # A linha abaixo foi alterada: 'Filters.text' e 'Filters.command'
+    # foram substituídos por 'filters.TEXT' e 'filters.COMMAND' (maiúsculas)
+    dp.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, answer_faq))
 
     # Configura o webhook
     # Certifique-se de que a URL do webhook está correta no Render
@@ -101,6 +115,9 @@ def main():
 
     # Inicia o servidor Flask
     return dp # Retorna o dispatcher para o Flask usar
+
+# Variável global para o dispatcher, para que possa ser acessada no webhook
+dispatcher = None
 
 if __name__ == '__main__':
     # O dispatcher é inicializado quando o script é executado pelo Gunicorn
