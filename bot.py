@@ -28,14 +28,19 @@ def load_faq_data():
     try:
         with open("faq_data.json", "r", encoding="utf-8") as f:
             faq_list = json.load(f)
-faq_data = {item["pergunta"].lower(): item["resposta"] for item in faq_list.values()}
-logger.info("FAQ_DATA carregado com sucesso.")
+        # CORREÇÃO: As linhas abaixo foram indentadas corretamente dentro do bloco 'try'
+        faq_data = {item["pergunta"].lower(): item["resposta"] for item in faq_list.values()}
+        logger.info("FAQ_DATA carregado com sucesso.")
     except FileNotFoundError:
         logger.error("Arquivo faq_data.json não encontrado.")
         faq_data = {}
     except json.JSONDecodeError:
         logger.error("Erro ao decodificar faq_data.json. Verifique a sintaxe JSON.")
         faq_data = {}
+    except Exception as e:
+        logger.error(f"Erro inesperado ao carregar faq_data: {e}")
+        faq_data = {}
+
 
 # Configura a API do Gemini
 def configure_gemini_api():
@@ -143,49 +148,17 @@ def home():
 # Executa a inicialização quando o aplicativo Flask é carregado
 @app.before_request
 def before_first_request():
-    # Usar asyncio.run() aqui seria problemático se o gunicorn já tem um loop de eventos.
-    # A melhor abordagem é ter a inicialização assíncrona feita pelo Gunicorn de forma apropriada.
-    # No entanto, para garantir que initialize_telegram_application() seja chamado
-    # e o webhook seja setado, podemos usar um truque ou confiar no primeiro POST
-    # para disparar a inicialização.
-
-    # Como gunicorn com gevent ou uvicorn gerenciam async,
-    # 'before_request' não é o lugar ideal para asyncio.run().
-    # A inicialização deve ser feita de forma mais integrada com o
-    # ASGI server ou com a primeira requisição.
-
     # Chamamos diretamente as funções de setup que não são assíncronas
     load_faq_data()
     configure_gemini_api()
-    # A inicialização assíncrona da aplicação do Telegram será feita
-    # quando o webhook for chamado pela primeira vez, se ainda não estiver pronta.
-    # Ou, idealmente, no startup do gunicorn/uvicorn.
-    # Para Render, o 'gunicorn bot:app' inicia o Flask.
-    # O set_webhook() é um método do bot, então precisa da Application.
-    # A maneira mais robusta é ter um handler no gunicorn para isso.
-
-    # Vamos fazer um workaround para o set_webhook, chamando-o quando a aplicação for instanciada.
-    # Isso será melhor gerenciado dentro da função que retorna a aplicação para o gunicorn.
     pass # Mantemos vazio aqui para não bloquear o startup sync
 
 
 # Função principal que o Gunicorn vai chamar
 def create_app():
-    # Esta função é chamada uma vez pelo Gunicorn para obter a instância da aplicação Flask.
-    # Podemos inicializar as coisas assíncronas aqui, se o Gunicorn permitir o contexto async.
-    # Para gunicorn[gevent], ele usa greenlets, então asyncio.run() ainda é um problema.
-    # O python-telegram-bot Application.initialize() é async.
-    # A melhor forma é deixar o `set_webhook` ser chamado apenas se `telegram_app` ainda não foi inicializado.
-
     # Chamadas síncronas que devem acontecer na inicialização do app
     load_faq_data()
     configure_gemini_api()
-
-    # Retorna a instância do Flask. O webhook será configurado
-    # na primeira requisição, se a aplicação ainda não estiver pronta.
-    # Para ser mais robusto, é ideal usar `telegram_app.run_webhook()`
-    # ou `telegram_app.run_polling()` se não for webhook, mas como é webhook,
-    # o Flask lida com a requisição e passa para o `process_update`.
 
     return app
 
@@ -195,17 +168,4 @@ if __name__ == "__main__":
     # Certifique-se de que as variáveis de ambiente estão configuradas.
     load_faq_data()
     configure_gemini_api()
-    # A inicialização assíncrona é mais complexa para teste local sem ASGI server.
-    # Para teste local, você geralmente usaria telegram_app.run_polling()
-    # ou um servidor ASGI como Uvicorn.
-
-    # Para o Render, Gunicorn vai chamar `bot:app`, que é a instância do Flask.
-    # A rota `/token` receberá as atualizações.
-
-    # Para forçar a inicialização do app e webhook no startup do Gunicorn,
-    # você pode mover a chamada para `initialize_telegram_application`
-    # para um ponto onde o event loop já está disponível (por exemplo,
-    # no handler da primeira requisição ou em um background task).
-    # No seu caso atual, o `initialize_telegram_application` precisa ser chamado
-    # ANTES que `telegram_app.process_update` seja invocado.
     pass # Não chame `app.run()` aqui para o Render.
