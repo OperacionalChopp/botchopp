@@ -7,9 +7,8 @@ from telegram.ext import (
     Updater,
     CommandHandler,
     MessageHandler,
-    # A linha abaixo foi alterada: 'Filters' foi substituído por 'filters' (minúsculo)
-    filters,
-    Dispatcher
+    filters # Alterado de 'Filters' para 'filters'
+    # 'Dispatcher' foi removido desta linha, pois será acessado via updater.dispatcher
 )
 from dotenv import load_dotenv
 
@@ -73,21 +72,21 @@ def answer_faq(update: Update, context):
 # Configuração do Flask para o webhook
 app = Flask(__name__)
 
+# Declara o dispatcher como global para ser acessível na função webhook
+dispatcher = None
+
 @app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
 def webhook():
     if request.method == "POST":
-        # ATENÇÃO: A linha abaixo tem um erro no seu código original.
-        # update = Update.dispatcher.update_queue.put(Update.de_json(request.get_json(), bot))
-        # Isso não deve ser feito diretamente assim para processar o webhook.
-        # O dispatcher do python-telegram-bot lida com isso.
-        # A forma correta é passar o JSON para o dispatcher para que ele processe o update.
-        # No seu setup com Gunicorn, o dispatcher precisa ser acessível globalmente.
-        # Vamos assumir que 'dispatcher' é uma variável global ou acessível aqui.
-        global dispatcher # Declara que vamos usar a variável global 'dispatcher'
+        # Processa o update usando o dispatcher que foi configurado em main()
         update_json = request.get_json()
         if update_json:
             update = Update.de_json(update_json, bot)
-            dispatcher.process_update(update) # Processa o update usando o dispatcher
+            # Verifica se o dispatcher foi inicializado antes de usá-lo
+            if dispatcher:
+                dispatcher.process_update(update)
+            else:
+                logger.error("Dispatcher não foi inicializado corretamente para o webhook.")
         return "ok"
     return "ok"
 
@@ -97,33 +96,27 @@ def index():
 
 # Função principal para configurar e iniciar o bot
 def main():
-    # Isso é necessário para que o Dispatcher esteja disponível globalmente para o webhook
-    # e para configurar os handlers
-    dp = Dispatcher(bot, None, workers=0)
+    # 'Updater' é usado para buscar updates, e ele contém o 'dispatcher'
+    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+    
+    # Obtém o dispatcher da instância do Updater
+    dp = updater.dispatcher
 
     # Handlers
     dp.add_handler(CommandHandler("start", start))
-    # A linha abaixo foi alterada: 'Filters.text' e 'Filters.command'
-    # foram substituídos por 'filters.TEXT' e 'filters.COMMAND' (maiúsculas)
     dp.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, answer_faq))
 
     # Configura o webhook
-    # Certifique-se de que a URL do webhook está correta no Render
-    # Ex: WEBHOOK_URL = "https://nome-do-seu-servico.onrender.com/SEU_TOKEN_DO_BOT"
     # O bot.set_webhook é chamado apenas uma vez, ou quando a URL muda
     bot.set_webhook(WEBHOOK_URL)
 
-    # Inicia o servidor Flask
-    return dp # Retorna o dispatcher para o Flask usar
-
-# Variável global para o dispatcher, para que possa ser acessada no webhook
-dispatcher = None
+    # Retorna o dispatcher para ser atribuído à variável global
+    return dp
 
 if __name__ == '__main__':
-    # O dispatcher é inicializado quando o script é executado pelo Gunicorn
-    # (ou localmente se você executar diretamente)
-    # E os handlers são adicionados
+    # O dispatcher é inicializado quando o script é executado (localmente ou pelo Gunicorn)
     dispatcher = main()
 
-    # O Flask é executado via Gunicorn, que chama bot:app
-    # A linha app.run() não é necessária quando usado com Gunicorn
+    # Não chame app.run() quando estiver usando Gunicorn, pois o Gunicorn irá gerenciar a execução do Flask.
+    # Esta linha é apenas para referência se você fosse rodar o Flask diretamente sem Gunicorn.
+    # app.run(port=os.getenv("PORT", 5000))
