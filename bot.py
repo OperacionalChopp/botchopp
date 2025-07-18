@@ -1,4 +1,4 @@
-# bot.py (VERSÃO FINAL E CORRIGIDA PARA ONDE O FAQ_DATA.JSON REALMENTE ESTÁ NO DEPLOY)
+# bot.py (VERSÃO FINAL E CORRIGIDA PARA ONDE O FAQ_DATA.JSON REALMENTE ESTÁ NO REPOSITÓRIO)
 
 import os
 import json
@@ -8,11 +8,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # --- Carregar dados do FAQ ---
 FAQ_DATA = {}
+# Corrigindo o caminho do arquivo para refletir a estrutura do seu repositório
+FAQ_FILE_PATH = 'base_conhecimento/faq_data.json' 
 try:
-    # O caminho do arquivo agora é diretamente na raiz,
-    # pois os logs indicam que ele está sendo encontrado lá.
-    FAQ_FILE_PATH = 'faq_data.json' 
-    
     if not os.path.exists(FAQ_FILE_PATH):
         print(f"ERRO CRÍTICO: O arquivo FAQ esperado em '{FAQ_FILE_PATH}' não foi encontrado. O bot não terá respostas do FAQ.")
     else:
@@ -128,7 +126,7 @@ async def handle_callback_query(update: Update, context):
         entry = FAQ_DATA.get(faq_id_from_button)
         if entry:
             response_text = entry["resposta"]
-            # Condição especial para o botão "Falar com Alguém" (ID 54)
+            # Condição especial para o botão "Falar com Alguém" (ID 54 no seu faq_data.json)
             if faq_id_from_button == "54": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
@@ -182,9 +180,3 @@ def main():
 
 # --- LINHA NECESSÁRIA PARA O DEPLOY NO RENDER ---
 app = main()
-
-# As linhas abaixo são para execução local e devem permanecer comentadas para o Render.
-# if __name__ == '__main__':
-#     from dotenv import load_dotenv
-#     load_dotenv()
-#     app.run(port=os.environ.get('PORT', 5000))
