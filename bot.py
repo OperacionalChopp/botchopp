@@ -1,17 +1,17 @@
 import os
 import logging
 import json
-from flask import Flask, request, jsonify # Para Flask, se estiver usando
+from flask import Flask, request, jsonify # Import Flask (mesmo que não inicializemos globalmente como 'app')
 from telegram import Update
 from telegram.ext import (
     Application,
-    Updater,
     CommandHandler,
     MessageHandler,
     filters,
     ContextTypes,
 )
 from dotenv import load_dotenv
+import unicodedata # Para normalize_text
 
 # Carrega variáveis de ambiente do .env
 load_dotenv()
@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Variáveis de ambiente (já confirmadas por você)
+# Variáveis de ambiente
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL") # Ex: https://botchopp.onrender.com
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -45,8 +45,6 @@ except json.JSONDecodeError:
     logger.error("Erro ao decodificar faq_data.json. Verifique a sintaxe JSON.")
 
 # Função para normalizar texto (remover acentos e converter para minúsculas)
-import unicodedata
-
 def normalize_text(text):
     text = text.lower()
     text = ''.join(
@@ -129,6 +127,10 @@ def main() -> None:
 
     # Iniciar o bot como um webhook
     # Esta parte configura o servidor web que vai ouvir as requisições do Telegram
+    # O Gunicorn (rodando 'gunicorn bot:app') espera uma variável 'app'
+    # mas 'python-telegram-bot' cuida do servidor web internamente com run_webhook
+    # Se 'bot:app' não for encontrado pelo Gunicorn, ele pode falhar.
+    # No entanto, esta era a versão anterior.
     application.run_webhook(
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", "10000")), # Render usa a porta 10000
