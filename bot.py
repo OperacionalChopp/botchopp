@@ -29,9 +29,9 @@ except json.JSONDecodeError:
 
 async def start(update: Update, context):
     """Envia a mensagem de boas-vindas com botões."""
-    welcome_entry = FAQ_DATA.get("1")
+    welcome_entry = FAQ_DATA.get("1") #
     if welcome_entry:
-        introduction_message = welcome_entry["resposta"]
+        introduction_message = welcome_entry["resposta"] #
 
         keyboard = [
             [InlineKeyboardButton("📍 Onde fica a loja?", callback_data="onde_fica")],
@@ -86,7 +86,7 @@ async def handle_message(update: Update, context):
         matched_entry = FAQ_DATA[best_match_faq_id]
         response_text = matched_entry["resposta"]
         
-        # Se a resposta for o FAQ de "Falar com alguém" (ID 54, anteriormente 4, mas 54 no seu FAQ_DATA.json)
+        # Se a resposta for o FAQ de "Falar com alguém" (ID 54 no seu faq_data.json)
         if best_match_faq_id == "54": 
             reply_markup = InlineKeyboardMarkup([
                 [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
@@ -144,7 +144,7 @@ async def handle_callback_query(update: Update, context):
         if entry:
             response_text = entry["resposta"]
             # Condição especial para a FAQ de "Falar com Alguém" se for acionada dinamicamente
-            if callback_data == "54": 
+            if callback_data == "54": #
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
