@@ -4,7 +4,7 @@ import os
 from flask import Flask, request
 from telegram import Update, Bot
 from telegram.ext import (
-    Updater,
+    Application, # Alterado: Importar Application
     CommandHandler,
     MessageHandler,
     filters
@@ -27,6 +27,7 @@ if not TELEGRAM_BOT_TOKEN:
     logger.error("TELEGRAM_BOT_TOKEN não encontrado nas variáveis de ambiente.")
     exit(1) # Sai do programa se o token não estiver configurado
 
+# O objeto Bot ainda é necessário, mas a inicialização do dispatcher muda.
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 
 # Carrega os dados do FAQ
@@ -81,21 +82,21 @@ def answer_faq(update: Update, context):
 # --- Configuração do Flask e Webhook ---
 
 app = Flask(__name__)
-# O dispatcher não será mais uma variável global fora de uma função de setup
-# Ele será inicializado uma vez quando o app for criado/configurado
+# O objeto Application será inicializado e armazenado como um atributo de 'app'
 
 @app.route(f'/{TELEGRAM_BOT_TOKEN}', methods=['POST'])
-def webhook():
+async def webhook(): # Adicionado 'async' pois Application.update_queue é assíncrono
     if request.method == "POST":
         update_json = request.get_json()
         if update_json:
             update = Update.de_json(update_json, bot)
-            # Acessamos o dispatcher diretamente do atributo 'app'
-            # Isso garante que ele esteja disponível, pois 'setup_bot' será chamada
-            if hasattr(app, 'dispatcher_instance') and app.dispatcher_instance:
-                app.dispatcher_instance.process_update(update)
+            # Adiciona o update à fila de processamento da Application
+            # app.application_instance é o nome do atributo que conterá a Application
+            if hasattr(app, 'application_instance') and app.application_instance:
+                # Usa o Application.update_queue para processar o update
+                await app.application_instance.update_queue.put(update)
             else:
-                logger.error("Dispatcher não foi inicializado corretamente para o webhook (atributo app.dispatcher_instance ausente).")
+                logger.error("Application não foi inicializada corretamente para o webhook (atributo app.application_instance ausente).")
         return "ok"
     return "ok"
 
@@ -103,40 +104,49 @@ def webhook():
 def index():
     return 'Bot está online!'
 
-# Função para configurar e iniciar o bot e seus handlers
-def setup_bot():
-    # 'Updater' é usado para buscar updates, e ele contém o 'dispatcher'
-    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
+# Função para configurar e iniciar a Application
+def setup_application():
+    # Cria a Application diretamente com o token
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
-    # Obtém o dispatcher da instância do Updater
-    dp = updater.dispatcher
-
-    # Handlers
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, answer_faq))
+    # Adiciona os handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, answer_faq))
 
     # Configura o webhook
-    # Esta linha deve ser executada apenas uma vez, idealmente na inicialização do servidor.
-    # Se você já configurou o webhook manualmente no BotFather para a URL do Render,
-    # pode ser que não precise chamar set_webhook a cada deploy, mas é seguro mantê-la.
     if WEBHOOK_URL:
         try:
-            bot.set_webhook(WEBHOOK_URL)
+            # Não é mais 'bot.set_webhook', mas sim application.bot.set_webhook
+            application.bot.set_webhook(WEBHOOK_URL)
             logger.info(f"Webhook configurado para: {WEBHOOK_URL}")
         except Exception as e:
             logger.error(f"Erro ao configurar o webhook: {e}")
     else:
-        logger.warning("WEBHOOK_URL não configurada. O bot não funcionará via webhook.")
+        logger.warning("WEBHOOK_URL não configurada. O bot pode não funcionar via webhook.")
+    
+    return application
 
-    return dp
+# Inicializa a Application uma vez quando o módulo é carregado
+# e a associa a um atributo da instância 'app'.
+app.application_instance = setup_application()
 
-# O Gunicorn precisa de uma instância 'app' Flask para rodar.
-# Ao invocar 'gunicorn bot:app', ele carregará este módulo e procurará por 'app'.
-# Vamos garantir que o dispatcher seja inicializado quando a aplicação Flask é criada/pronta.
+# Inicia o processamento em background (para o Application)
+# Isso é importante para que a Application comece a escutar e despachar updates.
+# Usamos application.run_polling() para iniciar o loop de eventos, mas em um ambiente de webhook
+# a Application precisa ser iniciada de forma assíncrona ou em um thread separado,
+# ou simplesmente deixamos o Gunicorn rodar a aplicação Flask e a Application
+# processa os updates que chegam via webhook.
+# Para o webhook, não chamamos run_polling, mas sim run_webhook.
+# No Render, a Application precisa ser "executada" para seus handlers funcionarem.
+# A forma mais simples de fazer isso com Flask/Gunicorn é ter o webhook
+# adicionando as updates a uma fila, e a Application processando essa fila.
+# application.run_webhook não é o que precisamos aqui, pois já temos o endpoint Flask.
 
-# Inicializa o dispatcher uma vez quando o módulo é carregado
-# e o associa a um atributo da instância 'app'.
-# Isso garante que ele esteja disponível para o webhook.
-app.dispatcher_instance = setup_bot()
+# O que precisamos é iniciar a 'Application' para que ela gerencie os handlers e a fila de updates.
+# No contexto de um servidor WSGI como Gunicorn, precisamos iniciar a Application de forma não-bloqueante.
+# A forma mais simples para este cenário (webhook POST para /<token>)
+# é deixar a Application rodando em segundo plano.
 
-# Nota: app.run() não é necessário aqui, pois o Gunicorn irá gerenciar o servidor Flask.
+# Este trecho de código abaixo é crucial para que a Application realmente processe as mensagens.
+# Ele roda a Application em um loop de eventos, mas de forma não-bloqueante para o Gunicorn/Flask.
+# Para WS
