@@ -6,6 +6,7 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, filters
 import google.generativeai as genai
 from dotenv import load_dotenv
+import asyncio # Importar asyncio
 
 # Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -28,7 +29,7 @@ def load_faq_data():
     try:
         with open("faq_data.json", "r", encoding="utf-8") as f:
             faq_list = json.load(f)
-        # CORREÇÃO: As linhas abaixo foram indentadas corretamente dentro do bloco 'try'
+        # As linhas abaixo foram indentadas corretamente dentro do bloco 'try'
         faq_data = {item["pergunta"].lower(): item["resposta"] for item in faq_list.values()}
         logger.info("FAQ_DATA carregado com sucesso.")
     except FileNotFoundError:
@@ -65,17 +66,13 @@ async def initialize_telegram_application():
             logger.error("BOT_TOKEN não está configurado nas variáveis de ambiente.")
             return
 
-        # Cria a aplicação sem o webhook inicialmente
         telegram_app = Application.builder().token(token).build()
 
-        # Adiciona os handlers aqui (exemplo: para mensagens de texto)
         telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-        # Inicializa a aplicação do telegram-bot
         await telegram_app.initialize()
         logger.info("Aplicação do Telegram Bot inicializada.")
 
-        # Configura o webhook APÓS a inicialização da aplicação
         webhook_url = os.getenv("WEBHOOK_URL")
         if webhook_url:
             try:
@@ -106,7 +103,6 @@ async def handle_message(update: Update, context):
     if gemini_model:
         try:
             logger.info(f"Nenhum FAQ satisfatório encontrado para '{user_message}'. Consultando Gemini...")
-            # Adicione um histórico de chat para manter o contexto
             chat = gemini_model.start_chat(history=[])
             gemini_response = chat.send_message(user_message).text
             await update.message.reply_text(gemini_response)
@@ -123,14 +119,24 @@ async def handle_message(update: Update, context):
 # Rota para o webhook do Telegram
 @app.route(f"/{os.getenv('BOT_TOKEN')}", methods=["POST"])
 async def telegram_webhook():
-    # Certifique-se de que a aplicação do bot está inicializada
-    if telegram_app is None or not telegram_app.updater.is_running:
-        logger.error("Aplicação do Telegram Bot não está inicializada ou rodando.")
-        # Tentativa de inicializar (pode ser necessário um restart do serviço)
-        await initialize_telegram_application()
-        if telegram_app is None or not telegram_app.updater.is_running:
-            return jsonify({"status": "error", "message": "Bot application not ready"}), 500
+    # Garante que as inicializações síncronas aconteçam
+    load_faq_data()
+    configure_gemini_api()
 
+    # Tenta inicializar o app do Telegram se ainda não estiver pronto
+    # Executa a função assíncrona de inicialização do Telegram dentro do loop de eventos.
+    # Isso é crucial para ambientes como Gunicorn que não rodam um loop de eventos automaticamente em todas as threads.
+    try:
+        if telegram_app is None or not telegram_app.updater.is_running:
+            logger.info("Tentando inicializar a aplicação do Telegram Bot no webhook request.")
+            await initialize_telegram_application()
+    except Exception as e:
+        logger.error(f"Erro crítico ao inicializar o Telegram Application no webhook: {e}", exc_info=True)
+        return jsonify({"status": "error", "message": "Bot application failed to initialize"}), 500
+
+    if telegram_app is None or not telegram_app.updater.is_running:
+        logger.error("Aplicação do Telegram Bot não está inicializada ou rodando após tentativa.")
+        return jsonify({"status": "error", "message": "Bot application not ready"}), 500
 
     try:
         update = Update.de_json(request.get_json(force=True), telegram_app.bot)
@@ -145,27 +151,25 @@ async def telegram_webhook():
 def home():
     return "Bot Chopp está online!"
 
-# Executa a inicialização quando o aplicativo Flask é carregado
-@app.before_request
-def before_first_request():
-    # Chamamos diretamente as funções de setup que não são assíncronas
-    load_faq_data()
-    configure_gemini_api()
-    pass # Mantemos vazio aqui para não bloquear o startup sync
-
-
 # Função principal que o Gunicorn vai chamar
 def create_app():
-    # Chamadas síncronas que devem acontecer na inicialização do app
+    # As funções síncronas são chamadas aqui para garantir que sejam executadas uma vez na inicialização do Gunicorn.
     load_faq_data()
     configure_gemini_api()
-
     return app
 
 # Se você estiver rodando localmente para testes (NÃO NO RENDER DIRETAMENTE):
 if __name__ == "__main__":
-    # Apenas para teste local, não é usado no Render com Gunicorn
-    # Certifique-se de que as variáveis de ambiente estão configuradas.
+    # Para teste local, é comum usar um loop de eventos para funções assíncronas.
+    # No Render com Gunicorn, o Gunicorn gerenciará o loop.
+    # Para rodar localmente e testar o webhook, você precisaria de um servidor ASGI como uvicorn.
+    # Ex: uvicorn bot:app --port 8000 --reload
+    # Ou, para testar a funcionalidade assíncrona (como o `set_webhook`),
+    # você pode forçar a execução assíncrona aqui, mas cuidado em ambientes de produção Gunicorn.
     load_faq_data()
     configure_gemini_api()
-    pass # Não chame `app.run()` aqui para o Render.
+
+    # Este bloco NÃO é executado pelo Gunicorn no Render, apenas para testes locais diretos.
+    # Se quiser testar o initialize_telegram_application() localmente, você pode fazer:
+    # asyncio.run(initialize_telegram_application())
+    pass
