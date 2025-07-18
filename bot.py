@@ -1,4 +1,4 @@
-# bot.py (VERSÃO FINAL E CORRIGIDA PARA ONDE O FAQ_DATA.JSON REALMENTE ESTÁ NO REPOSITÓRIO)
+# bot.py (VERSÃO FINAL E CORRIGIDA COM FAQ_DATA.JSON NA RAIZ DO REPOSITÓRIO)
 
 import os
 import json
@@ -8,8 +8,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 
 # --- Carregar dados do FAQ ---
 FAQ_DATA = {}
-# Corrigindo o caminho do arquivo para refletir a estrutura do seu repositório
-FAQ_FILE_PATH = 'base_conhecimento/faq_data.json' 
+# Corrigindo o caminho do arquivo para a raiz, conforme sua última informação
+FAQ_FILE_PATH = 'faq_data.json' 
 try:
     if not os.path.exists(FAQ_FILE_PATH):
         print(f"ERRO CRÍTICO: O arquivo FAQ esperado em '{FAQ_FILE_PATH}' não foi encontrado. O bot não terá respostas do FAQ.")
@@ -27,9 +27,9 @@ except json.JSONDecodeError:
 
 async def start(update: Update, context):
     """Envia a mensagem de boas-vindas com botões."""
-    welcome_entry = FAQ_DATA.get("1") #
+    welcome_entry = FAQ_DATA.get("1")
     if welcome_entry:
-        introduction_message = welcome_entry["resposta"] #
+        introduction_message = welcome_entry["resposta"]
 
         keyboard = [
             [InlineKeyboardButton("📍 Onde fica a loja?", callback_data="onde_fica")],
@@ -126,7 +126,7 @@ async def handle_callback_query(update: Update, context):
         entry = FAQ_DATA.get(faq_id_from_button)
         if entry:
             response_text = entry["resposta"]
-            # Condição especial para o botão "Falar com Alguém" (ID 54 no seu faq_data.json)
+            # Condição especial para o botão "Falar com Alguém" (ID 54)
             if faq_id_from_button == "54": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
@@ -142,7 +142,7 @@ async def handle_callback_query(update: Update, context):
         if entry:
             response_text = entry["resposta"]
             # Condição especial para a FAQ de "Falar com Alguém" se for acionada dinamicamente
-            if callback_data == "54": #
+            if callback_data == "54": 
                 reply_markup = InlineKeyboardMarkup([
                     [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
@@ -180,3 +180,9 @@ def main():
 
 # --- LINHA NECESSÁRIA PARA O DEPLOY NO RENDER ---
 app = main()
+
+# As linhas abaixo são para execução local e devem permanecer comentadas para o Render.
+# if __name__ == '__main__':
+#     from dotenv import load_dotenv
+#     load_dotenv()
+#     app.run(port=os.environ.get('PORT', 5000))
