@@ -1,4 +1,4 @@
-# bot.py (VERSÃO CORRIGIDA PARA PALAVRAS-CHAVE E RESPOSTAS DE BOTÕES)
+# bot.py (VERSÃO FINAL COM CORREÇÕES DE CAMINHO, LÓGICA DE BUSCA E RESPOSTAS DE BOTÕES)
 
 import os
 import json
@@ -9,14 +9,19 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # --- Carregar dados do FAQ ---
 FAQ_DATA = {}
 try:
-    with open('faq_data.json', 'r', encoding='utf-8') as f:
+    # CORREÇÃO CRÍTICA AQUI: Caminho do arquivo FAQ_DATA na subpasta
+    with open('base_conhecimento/faq_data.json', 'r', encoding='utf-8') as f:
         FAQ_DATA = json.load(f)
     print(f"DEBUG: FAQ_DATA carregado com {len(FAQ_DATA)} entradas.")
     print(f"DEBUG: Conteúdo de FAQ_DATA (primeiras 500 chars): {str(FAQ_DATA)[:500]}")
+    if not FAQ_DATA:
+        print("ALERTA: FAQ_DATA carregado mas está vazio. Verifique o conteúdo do JSON.")
 except FileNotFoundError:
-    print("ERRO: faq_data.json não encontrado. Certifique-se de que o arquivo está na raiz do projeto.")
+    print("ERRO: faq_data.json não encontrado. Certifique-se de que o arquivo 'base_conhecimento/faq_data.json' existe.")
+    # Adicionar um fallback ou tratamento de erro adequado, talvez uma FAQ default
 except json.JSONDecodeError:
-    print("ERRO: faq_data.json com formato JSON inválido.")
+    print("ERRO: faq_data.json com formato JSON inválido. Verifique o conteúdo e a sintaxe do arquivo JSON.")
+    # Adicionar um fallback ou tratamento de erro adequado
 
 # --- Seus handlers (comandos e mensagens) ---
 
@@ -37,61 +42,69 @@ async def start(update: Update, context):
 
         await update.message.reply_text(introduction_message, reply_markup=reply_markup)
     else:
-        await update.message.reply_text('Olá! Eu sou seu bot! Parece que a mensagem de boas-vindas não foi carregada corretamente. Por favor, verifique o arquivo FAQ.')
+        await update.message.reply_text('Olá! Eu sou seu bot! Parece que a mensagem de boas-vindas não foi carregada corretamente ou o FAQ_DATA está vazio. Por favor, verifique o arquivo FAQ.')
 
 async def handle_message(update: Update, context):
     """
     Processa mensagens de texto (não comandos) e tenta encontrar respostas no FAQ.
-    Se encontrar palavras-chave relevantes, pode apresentar botões de perguntas relacionadas.
+    Prioriza correspondências exatas e oferece botões para correspondências parciais.
     """
-    user_text = update.message.text.lower()
-    response_text = "Desculpe, não consegui encontrar uma resposta para sua pergunta no momento. Por favor, tente reformular ou use os botões abaixo para explorar as opções."
+    user_text = update.message.text.lower().strip() # Normaliza o texto do usuário
+    response_text = "Desculpe, não consegui encontrar uma resposta exata para sua pergunta no momento. Por favor, tente reformular ou escolha uma das opções abaixo."
     reply_markup = None
     
-    related_faq_buttons = []
-    found_exact_match = False 
+    # Lista para coletar FAQs que contêm as palavras-chave do usuário
+    potential_matches = [] 
 
-    # Para cada entrada do FAQ (pulando a de boas-vindas)
+    # --- Lógica de busca de correspondência ---
+    # 1. Procura por correspondência EXATA da mensagem do usuário com uma palavra-chave
+    for faq_id, entry in FAQ_DATA.items():
+        if faq_id == "1": # Pula a FAQ de boas-vindas
+            continue
+        
+        entry_keywords = [kw.lower() for kw in entry.get("palavras_chave", [])]
+        
+        if user_text in entry_keywords: # Se a mensagem do usuário é uma palavra-chave EXATA
+            response_text = entry["resposta"]
+            if faq_id == "54": # ID para "Falar com alguém"
+                reply_markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
+                    [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
+                ])
+            await update.message.reply_text(response_text, reply_markup=reply_markup)
+            return # Encontrou uma correspondência exata, termina a função aqui
+
+    # 2. Se não encontrou correspondência exata, procura por palavras-chave CONTIDAS na mensagem
     for faq_id, entry in FAQ_DATA.items():
         if faq_id == "1": 
             continue
         
         entry_keywords = [kw.lower() for kw in entry.get("palavras_chave", [])]
         
-        # Verifica se a mensagem do usuário é uma palavra-chave exata ou contém uma palavra-chave
-        # prioriza a correspondência exata para a resposta direta
-        if user_text in entry_keywords:
-            response_text = entry["resposta"]
-            # Adiciona botões de contato se for a FAQ de falar com alguém
-            if faq_id == "54": # ID 54 é "Não encontrei minha dúvida. Como posso ser atendido?"
-                reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📞 Ligar para a Loja", url="tel:+556139717502")],
-                    [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
-                ])
-            found_exact_match = True
-            break # Encontrou uma correspondência exata, para a busca
-        
-        # Se não houve correspondência exata, verifica se há palavras-chave contidas
-        # e coleta perguntas relacionadas para apresentar como botões
-        if not found_exact_match:
-            matches = [kw for kw in entry_keywords if kw in user_text]
-            if matches:
-                # Adiciona apenas se ainda não foi adicionado (para evitar duplicatas)
-                # Verifica se o botão já existe na lista antes de adicionar
-                if not any(btn[0].callback_data == faq_id for btn in related_faq_buttons):
-                    related_faq_buttons.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
+        # Verifica se alguma palavra-chave da FAQ está contida na mensagem do usuário
+        # ou se alguma palavra da mensagem do usuário está na palavra-chave da FAQ
+        # Isso aumenta a flexibilidade da busca
+        if any(kw in user_text for kw in entry_keywords) or \
+           any(word in ' '.join(entry_keywords) for word in user_text.split()):
+            
+            # Adiciona a pergunta da FAQ como um botão de opção
+            # Garante que não adicione duplicatas
+            if not any(btn[0].callback_data == faq_id for btn in potential_matches):
+                potential_matches.append([InlineKeyboardButton(entry["pergunta"], callback_data=faq_id)])
 
-    if found_exact_match:
-        await update.message.reply_text(response_text, reply_markup=reply_markup)
-    elif related_faq_buttons:
-        # Se encontrou termos relacionados, oferece botões de perguntas
+    if potential_matches:
+        # Se encontrou termos relacionados, oferece botões de perguntas para o usuário escolher
         await update.message.reply_text(
             "Encontrei algumas informações que podem ser úteis. Qual delas você gostaria de saber?",
-            reply_markup=InlineKeyboardMarkup(related_faq_buttons)
+            reply_markup=InlineKeyboardMarkup(potential_matches)
         )
     else:
         # Se não encontrou nada específico nem relacionado
-        await update.message.reply_text(response_text, reply_markup=reply_markup)
+        # Aqui você pode adicionar um fallback para a opção "Falar com alguém" se desejar
+        keyboard_fallback = [
+            [InlineKeyboardButton("📞 Falar com alguém", callback_data="falar_com_alguem")]
+        ]
+        await update.message.reply_text(response_text, reply_markup=InlineKeyboardMarkup(keyboard_fallback))
 
 
 async def handle_callback_query(update: Update, context):
@@ -104,12 +117,11 @@ async def handle_callback_query(update: Update, context):
     reply_markup = None
 
     # Mapeamento dos callback_data dos botões iniciais para os IDs de FAQ correspondentes
-    # Usei os IDs do seu `faq_data.json` para mapear os botões do /start
     mapping = {
         "onde_fica": "5",     # "Como encontrar a loja Chopp Brahma Express mais próxima?"
         "horario": "3",       # "Qual é o horário de atendimento de vocês?"
         "cardapio": "6",      # "Quais produtos estão disponíveis e como selecionar?"
-        "duvida_ia": None,    # Esta é uma ação, não uma FAQ direta
+        "duvida_ia": None,    # Esta é uma ação, não uma FAQ direta. A resposta é dada abaixo.
         "falar_com_alguem": "54" # "Não encontrei minha dúvida. Como posso ser atendido?"
     }
 
@@ -126,11 +138,11 @@ async def handle_callback_query(update: Update, context):
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
         else:
-            response_text = f"Erro: FAQ ID '{faq_id_from_button}' não encontrado para a opção '{callback_data}'."
+            response_text = f"Erro: FAQ ID '{faq_id_from_button}' não encontrado para a opção '{callback_data}'. Verifique o faq_data.json."
     elif callback_data == "duvida_ia":
         response_text = "Estou pronto para tirar suas dúvidas! Digite sua pergunta agora e tentarei responder com base nas minhas informações. Se precisar de algo que não sei, use a opção 'Falar com alguém'."
     else:
-        # Caso o callback_data seja diretamente um ID de FAQ (dos botões dinâmicos)
+        # Caso o callback_data seja diretamente um ID de FAQ (dos botões dinâmicos de handle_message)
         entry = FAQ_DATA.get(callback_data) 
         if entry:
             response_text = entry["resposta"]
@@ -141,9 +153,9 @@ async def handle_callback_query(update: Update, context):
                     [InlineKeyboardButton("💬 Abrir Chat", url="https://wa.me/556139717502")]
                 ])
         else:
-            response_text = f"Opção de callback '{callback_data}' não reconhecida ou FAQ ID não encontrado."
+            response_text = f"Opção de callback '{callback_data}' não reconhecida ou FAQ ID não encontrado. Verifique os dados."
 
-    # --- LINHA MODIFICADA AQUI: ENVIAR NOVA MENSAGEM AO INVÉS DE EDITAR ---
+    # ENVIAR NOVA MENSAGEM AO INVÉS DE EDITAR A ANTERIOR
     await context.bot.send_message(chat_id=query.message.chat_id, text=response_text, reply_markup=reply_markup)
     
     # Opcional: Se quiser que a mensagem original com os botões seja deletada, descomente a linha abaixo:
